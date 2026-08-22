@@ -62,4 +62,5 @@ Below are some useful settings that make this mod stand out from similar alterna
 
 <p align="center">
   <sub>Mod made by <a href="https://github.com/rivalzin">Rivalzin</a> (me :D), page design inspired by <a href="https://github.com/Terrunic">Terrunic</a> and <a href="https://github.com/evanbones">Evan Bowness</a></sub>
+  <sub>This code was AI-Assisted.</a></sub>
 </p>
