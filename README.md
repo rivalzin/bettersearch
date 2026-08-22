@@ -66,4 +66,4 @@ Below are some useful settings that make this mod stand out from similar alterna
 
 
   # **DISCLAIMER!**
-  # **This code was AI-Assisted.**
+  # **This code was AI-Assisted, but vet by a Real Dev.**
