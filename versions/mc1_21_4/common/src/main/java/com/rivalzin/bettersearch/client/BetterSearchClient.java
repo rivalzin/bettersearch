@@ -16,18 +16,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-/**
- * Estado do mod no cliente: configuracao, tabela de idiomas e indice atual.
- *
- * <p>Regra de ouro: <b>nunca travar o jogo</b>. Se o indice ainda esta sendo montado, se a
- * configuracao desliga o mod ou se algo explode, todos os metodos publicos devolvem
- * {@code null} e o mixin simplesmente deixa a busca original do Minecraft agir.
- *
- * <p>Depende so de classes que existem em qualquer loader ({@code Minecraft}, {@code Util},
- * {@code ItemStack}); nada de NeoForge aqui.
- */
 public final class BetterSearchClient {
-
     private static SearchSettings settings = new SearchSettings();
     private static volatile LanguageTable languages = LanguageTable.EMPTY;
     private static Path configFile;
@@ -37,9 +26,11 @@ public final class BetterSearchClient {
     private static int indexedSize = -1;
     private static long indexedStamp = -1;
 
+    // bumped on every reload so every cache downstream knows to drop
     private static long languageStamp;
     private static boolean building;
     private static boolean resourcesReady;
+    // one throw and the mod stands down for the session instead of spamming
     private static boolean disabledByError;
 
     private static Object pendingSource;
@@ -51,18 +42,14 @@ public final class BetterSearchClient {
     private BetterSearchClient() {
     }
 
-    // ------------------------------------------------------------------ ciclo de vida
-
     public static SearchSettings settings() {
         return settings;
     }
 
-    /** Tabela de idiomas atual, compartilhada por todos os indices do mod. */
     public static LanguageTable languages() {
         return languages;
     }
 
-    /** Muda sempre que os idiomas ou a configuracao mudam; invalida todos os indices. */
     public static long languageStamp() {
         return languageStamp;
     }
@@ -72,30 +59,15 @@ public final class BetterSearchClient {
         SearchSettings previous = settings;
         settings = newSettings;
 
-        // O cache do ultimo resultado sempre morre: qualquer opcao pode mudar o que sai.
         cachedQuery = null;
         cachedResults = null;
 
-        // O INDICE, nao. Remonta-lo leva de decimos de segundo a alguns segundos, e nesse
-        // meio tempo o mod devolve a busca original - era por isso que, logo depois de mexer
-        // numa opcao, parecia que nada tinha mudado. Agora so as quatro opcoes que alteram o
-        // conteudo do indice o descartam; o resto vale na hora.
         if (previous == null || newSettings.affectsIndex(previous)) {
             invalidate();
         }
         reloadLanguagesIfNeeded();
     }
 
-    /**
-     * O usuario ligou um idioma que ainda nao foi lido do disco? Entao relemos a tabela.
-     *
-     * <p>Trocar idiomas na tela de configuracao nao dispara um reload de recursos, que e
-     * quando a tabela normalmente e montada. Sem isto, ligar um idioma novo so teria efeito
-     * depois de um F3+T ou de reiniciar o jogo.
-     *
-     * <p>Desligar um idioma tem efeito na hora e nao depende disto: quem monta o indice ja
-     * confere {@code settings.indexesLanguage(...)} para cada idioma.
-     */
     private static void reloadLanguagesIfNeeded() {
         if (!resourcesReady || languages.matchesRequest(settings)) {
             return;
@@ -110,7 +82,7 @@ public final class BetterSearchClient {
                 .supplyAsync(() -> LanguageTable.load(resourceManager, snapshot), Util.backgroundExecutor())
                 .whenComplete((table, error) -> minecraft.execute(() -> {
                     if (error != null) {
-                        BetterSearch.LOGGER.error("[{}] falha ao recarregar os idiomas",
+                        BetterSearch.LOGGER.error("[{}] failed to reload languages",
                                 BetterSearch.MOD_NAME, error);
                         return;
                     }
@@ -118,14 +90,6 @@ public final class BetterSearchClient {
                 }));
     }
 
-    /** Onde a configuracao mora em disco. Definido pela camada de plataforma na inicializacao. */
-    /**
-     * Abre a tela de configuracao, se der.
-     *
-     * <p>Fica aqui, e nao em cada loader, porque a regra ("so quando nenhuma tela estiver
-     * aberta") tem de ser a mesma nos dois - senao o atalho se comporta diferente no Fabric
-     * e no NeoForge por puro descuido.
-     */
     public static void openConfigScreen() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft != null && minecraft.screen == null) {
@@ -137,48 +101,30 @@ public final class BetterSearchClient {
         configFile = file;
     }
 
-    /**
-     * Aplica o que o usuario escolheu na tela de configuracao e grava no disco.
-     * O indice e descartado, entao a proxima busca ja usa os valores novos.
-     */
     public static void applyAndSave(SearchSettings newSettings) {
         setSettings(newSettings.copy());
         if (configFile != null) {
             ConfigIo.save(configFile, settings);
         }
-        /*
-         * Aviso aos ganchos de visualizador. Sem isto, desligar um interruptor parecia nao
-         * fazer nada neles: JEI, REI e EMI guardam o resultado do texto ATUAL e nada os
-         * fazia recomputar ate o texto mudar (bug de campo: EMI no Cobblemon, 1.21.1).
-         * So Runnables aqui - nome de classe de visualizador nao pode aparecer nesta
-         * classe (secao 9 do verify); cada gancho se inscreve sozinho quando carrega.
-         */
+
         for (Runnable listener : settingsAppliedListeners) {
             try {
                 listener.run();
             } catch (Throwable t) {
-                BetterSearch.LOGGER.debug("[{}] ouvinte de configuracao falhou: {}",
+                BetterSearch.LOGGER.debug("[{}] settings listener failed: {}",
                         BetterSearch.MOD_NAME, t.toString());
             }
         }
     }
 
-    /** Ganchos de visualizador se inscrevem aqui ao carregar; o aviso sai no applyAndSave. */
     private static final java.util.List<Runnable> settingsAppliedListeners =
             new java.util.concurrent.CopyOnWriteArrayList<>();
 
+    // viewers hold their own caches, this is how they hear about a change
     public static void onSettingsApplied(Runnable listener) {
         settingsAppliedListeners.add(listener);
     }
 
-    /**
-     * Cinto de seguranca da tabela de idiomas: se o listener de reload nao se registrou
-     * (a linha 21.4 do NeoForge trocou o evento no meio; um build futuro pode trocar de
-     * novo), a primeira chamada daqui dispara a MESMA carga em segundo plano. Chamar so
-     * depois de o cliente estar de pe (primeiro tique) - ai a carga de recursos da
-     * inicializacao ja acabou e o ResourceManager esta inteiro. Com o listener funcionando,
-     * isto e um no-op: os recursos ja chegaram prontos.
-     */
     public static void ensureLanguagesLoaded() {
         if (!resourcesReady) {
             resourcesReady = true;
@@ -186,7 +132,6 @@ public final class BetterSearchClient {
         }
     }
 
-    /** Chamado quando os recursos (e portanto os idiomas) sao recarregados. */
     public static void onLanguagesLoaded(LanguageTable table) {
         languages = table;
         resourcesReady = true;
@@ -199,8 +144,7 @@ public final class BetterSearchClient {
         indexedSource = null;
         indexedSize = -1;
         indexedStamp = -1;
-        // Importante: zerar tambem o "pendente", senao o proximo ensureIndex acharia que ja
-        // existe uma montagem em andamento para esta lista e nunca reconstruiria o indice.
+
         pendingSource = null;
         pendingSize = -1;
         cachedQuery = null;
@@ -208,15 +152,6 @@ public final class BetterSearchClient {
         RecipeSearch.invalidate();
         CommandItemIndex.invalidate();
 
-        // Os indices do JEI, do EMI e do REI NAO sao invalidados por chamada daqui, e isso e
-        // deliberado. Esta classe carrega sempre, com ou sem aqueles mods instalados; tocar
-        // naquelas classes obrigaria a JVM a resolve-las, e sem o mod correspondente no pack
-        // isso vira NoClassDefFoundError antes mesmo do jogo abrir.
-        //
-        // Em vez disso o contador abaixo sobe. Os tres guardam o indice com o carimbo junto e
-        // conferem sozinhos a cada busca, entao um carimbo novo ja significa "remonte". Quem
-        // nao esta instalado nao tem indice para remontar, e nenhuma classe daquele mod chega
-        // a ser mencionada.
         languageStamp++;
     }
 
@@ -224,21 +159,12 @@ public final class BetterSearchClient {
         return settings.enabled && !disabledByError;
     }
 
-    // ------------------------------------------------------------------ busca
-
-    /**
-     * Comeca a montar o indice, se necessario. Chamado quando a aba de busca abre, para que
-     * o indice ja esteja pronto quando a primeira letra for digitada.
-     */
     public static void prepare(Collection<ItemStack> displayItems) {
         if (isEnabled() && settings.searchCreative && displayItems != null) {
             ensureIndex(displayItems);
         }
     }
 
-    /**
-     * @return os itens que casam com a consulta, ou {@code null} para "use a busca original".
-     */
     public static List<ItemStack> search(String rawQuery, Collection<ItemStack> displayItems) {
         if (!isEnabled() || !settings.searchCreative || rawQuery == null || displayItems == null) {
             return null;
@@ -261,13 +187,11 @@ public final class BetterSearchClient {
             return results;
         } catch (Throwable t) {
             disabledByError = true;
-            BetterSearch.LOGGER.error("[{}] erro na busca; voltando para a busca original",
+            BetterSearch.LOGGER.error("[{}] search failed, falling back to vanilla",
                     BetterSearch.MOD_NAME, t);
             return null;
         }
     }
-
-    // ------------------------------------------------------------------ indice
 
     private static SearchIndex<ItemStack> ensureIndex(Collection<ItemStack> source) {
         SearchIndex<ItemStack> current = index;
@@ -288,7 +212,7 @@ public final class BetterSearchClient {
         Minecraft minecraft = Minecraft.getInstance();
         Player player = minecraft.player;
         if (player == null) {
-            return; // ainda nao ha mundo; tentamos de novo na proxima chamada
+            return;
         }
 
         final List<ItemStack> snapshot = List.copyOf(source);
@@ -307,7 +231,7 @@ public final class BetterSearchClient {
                 .whenComplete((built, error) -> minecraft.execute(() -> {
                     building = false;
                     if (error != null) {
-                        BetterSearch.LOGGER.error("[{}] falha ao montar o indice; usando a busca original",
+                        BetterSearch.LOGGER.error("[{}] index build failed, using vanilla search",
                                 BetterSearch.MOD_NAME, error);
                         disabledByError = true;
                         return;

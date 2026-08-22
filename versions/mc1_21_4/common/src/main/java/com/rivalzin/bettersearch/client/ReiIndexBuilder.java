@@ -14,15 +14,8 @@ import net.minecraft.world.item.ItemStack;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Transforma a lista de entradas do REI em um {@link SearchIndex}.
- *
- * <p>Irmao gemeo do JeiIndexBuilder (modulo neoforge nesta versao), e de proposito: as entradas saem do mesmo
- * {@link CreativeIndexBuilder#fill} que monta o indice do criativo, entao o que o menu do Better
- * Search acha, o REI acha, com os mesmos campos e as mesmas opcoes.
- */
+// one entry per stack, REI groups them again on its side
 public final class ReiIndexBuilder {
-
     private ReiIndexBuilder() {
     }
 
@@ -53,19 +46,17 @@ public final class ReiIndexBuilder {
                     entries.add(builder.build());
                 }
             } catch (Throwable t) {
-                // Uma entrada problematica de algum mod nao pode derrubar a lista inteira.
-                BetterSearch.LOGGER.debug("[{}] entrada do REI ignorada no indice: {}",
+                BetterSearch.LOGGER.debug("[{}] REI entry skipped in index: {}",
                         BetterSearch.MOD_NAME, t.toString());
             }
         }
 
-        BetterSearch.LOGGER.info("[{}] indice do REI pronto: {} de {} entradas em {} ms",
+        BetterSearch.LOGGER.info("[{}] REI index ready: {} of {} entries in {} ms",
                 BetterSearch.MOD_NAME, entries.size(), source.size(),
                 (System.nanoTime() - start) / 1_000_000);
         return new SearchIndex<>(entries);
     }
 
-    /** Fluido, ou o tipo proprio de algum mod: sobra o que o REI sabe dizer de qualquer um. */
     private static void fillOther(EntryBuilder<EntryStack<?>> builder, EntryStack<?> stack,
                                   SearchSettings settings) {
         builder.add(stack.asFormatStrippedText().getString(), SearchField.SOURCE_NATIVE);

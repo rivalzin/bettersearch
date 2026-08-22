@@ -5,14 +5,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/**
- * Monta uma entrada do indice normalizando e deduplicando os textos.
- *
- * <p>A deduplicacao importa muito: "TNT" e "TNT" em 18 idiomas viraria 18 campos identicos.
- * Guardando so os textos distintos, um modpack com 20 mil itens continua leve.
- */
+// built once per item at index time, never during a search
 public final class EntryBuilder<T> {
-
     private final T value;
     private final List<SearchField> fields = new ArrayList<>(4);
     private final Set<String> seen = new HashSet<>(8);
@@ -22,7 +16,6 @@ public final class EntryBuilder<T> {
         this.value = value;
     }
 
-    /** Adiciona um texto ja normalizado. */
     public EntryBuilder<T> addNormalized(String normalized, byte source) {
         if (normalized != null && !normalized.isEmpty() && seen.add(normalized)) {
             fields.add(new SearchField(normalized, source));
@@ -30,7 +23,6 @@ public final class EntryBuilder<T> {
         return this;
     }
 
-    /** Normaliza e adiciona um texto cru. */
     public EntryBuilder<T> add(String rawText, byte source) {
         return addNormalized(TextNormalizer.normalize(rawText), source);
     }

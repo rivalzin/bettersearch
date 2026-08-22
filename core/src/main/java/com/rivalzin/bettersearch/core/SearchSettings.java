@@ -5,144 +5,61 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Configuracao do mod. POJO puro (sem Gson, sem NeoForge, sem Minecraft) para que a mesma
- * classe sirva a qualquer loader; a serializacao fica na camada de plataforma.
- */
+// plain fields on purpose: this is read millions of times per search
 public final class SearchSettings {
-
-    /** Idiomas indexados por padrao alem do idioma atual do jogo. */
     public static final List<String> DEFAULT_LANGUAGES = Collections.unmodifiableList(Arrays.asList(
             "en_us", "es_es", "es_mx", "pt_br", "pt_pt", "fr_fr", "de_de", "it_it",
             "nl_nl", "pl_pl", "ru_ru", "uk_ua", "tr_tr", "sv_se",
             "zh_cn", "zh_tw", "ja_jp", "ko_kr"));
 
-    /** Liga/desliga o mod inteiro (todas as buscas voltam a ser as originais). */
     public boolean enabled = true;
 
-    // ---- Onde o mod atua (aba "Avancado") ---------------------------------------------
-
-    /** Barra de busca do inventario criativo. */
     public boolean searchCreative = true;
 
-    /** Barra de busca do livro de receitas. */
     public boolean searchRecipeBook = true;
 
-    /** Nomes de jogadores nas sugestoes de comando e do chat, tolerando erro de digitacao. */
     public boolean searchPlayerNames = true;
 
-    /**
-     * Sugere IDs de item a partir do nome traduzido: {@code /give @p bau} propoe
-     * {@code minecraft:chest}.
-     */
     public boolean searchCommandItems = true;
 
-    /**
-     * Corrige a palavra errada de um comando: {@code /gamemode criativo} passa a oferecer
-     * {@code creative}.
-     *
-     * <p>Nao tem nada para ajustar - o comparador e fixo, mais tolerante que o da busca de
-     * itens, e mostra no maximo tres opcoes. So da para ligar e desligar.
-     */
     public boolean fixCommandErrors = true;
 
-    /** Quantas sugestoes o mod pode acrescentar por vez. */
     public int commandSuggestionLimit = 12;
 
-    /**
-     * Integracao com o JEI.
-     *
-     * <p>Ligado, a lista de itens do JEI passa a usar a MESMA busca do menu do Better Search:
-     * mesmo indice, mesmos idiomas, mesma tolerancia a erro, mesma ordenacao. Nao existe
-     * configuracao separada para o JEI - o que estiver marcado aqui vale la.
-     *
-     * <p>Desligado, o mixin devolve na primeira linha e a busca dele fica exatamente como era.
-     */
     public boolean searchJei = true;
 
-    /**
-     * Integracao com o EMI.
-     *
-     * <p>O EMI so tem lancamento oficial ate a 1.21.1, mas a opcao aparece em todas as versoes
-     * de proposito: se alguem portar o EMI, o gancho ja esta la e passa a funcionar sozinho.
-     * Sem o EMI instalado nada disto e sequer carregado.
-     *
-     * <p>Usa o mesmo indice e as mesmas opcoes do JEI e do criativo. Nao ha numero de ajuste
-     * so para ele, nem so para o JEI: quem manda e a tela de configuracao, inteira.
-     */
     public boolean searchEmi = true;
 
-    /**
-     * Integracao com o REI (Roughly Enough Items).
-     *
-     * <p>O encaixe e diferente do JEI e do EMI porque a busca do REI e um {@code Predicate}, e nao
-     * uma lista - ele pergunta entrada por entrada em vez de devolver o resultado pronto. O que
-     * muda e so o caminho: o indice, os idiomas e as opcoes sao os mesmos dos outros dois.
-     */
     public boolean searchRei = true;
 
-    /** Tolerancia a erros de digitacao: 0 = desligada, 1 = baixa, 2 = normal, 3 = alta. */
     public int typoTolerance = 2;
 
-    /**
-     * Palavras menores que isto precisam estar escritas corretamente.
-     *
-     * <p>E o UNICO limite de tamanho do sistema: o nivel de tolerancia decide quantos erros
-     * sao aceitos, este valor decide a partir de que tamanho eles passam a ser aceitos.
-     */
     public int minTypoLength = 4;
 
-    /** Casar iniciais: "ds" acha "Diamond Sword". */
     public boolean matchInitials = true;
 
-    /** Ignorar espacos: "netheritesword" acha "Netherite Sword". */
     public boolean ignoreSpaces = true;
 
-    /** Procura tambem o nome do item em outros idiomas ("pomme" acha a maca). */
     public boolean crossLanguage = true;
 
-    /**
-     * Idiomas extras indexados. Use {@code ["*"]} para indexar TODOS os idiomas disponiveis
-     * (mais cobertura, bem mais memoria).
-     */
     public List<String> languages = new ArrayList<>(DEFAULT_LANGUAGES);
 
-    /**
-     * Se {@code true}, nomes em idiomas estrangeiros so casam de forma estrita
-     * (exato / prefixo / substring) - sem tolerancia a erro de digitacao.
-     * Evita ruido vindo de 18 idiomas ao mesmo tempo.
-     */
     public boolean foreignStrictOnly = true;
 
-    /** Ordena os resultados por relevancia em vez da ordem das abas. */
     public boolean sortByRelevance = true;
 
-    /** Indexa as linhas de tooltip de itens com componentes (livros encantados, pocoes...). */
     public boolean searchTooltips = true;
 
-    /** Permite procurar por id ("minecraft:diamond_sword", "diamond_sword"). */
     public boolean searchItemIds = true;
 
-    /** Permite filtrar por mod com "@": {@code @create sword}. */
     public boolean searchModIds = true;
 
-    /**
-     * A segunda passada (com tolerancia a erro) so roda se a passada estrita devolver
-     * menos que este numero de itens. Mantem a digitacao instantanea em modpacks gigantes.
-     */
     public int fuzzyThreshold = 60;
 
-    /**
-     * Ultima tentativa: deixa cada palavra da consulta casar com um idioma diferente do
-     * mesmo item ("espada de netherite" + "sword" misturados). Roda so quando quase nada
-     * foi encontrado, entao nao atrapalha as buscas normais.
-     */
     public boolean crossFieldMatching = true;
 
-    /** Limite de resultados abaixo do qual a passada cruzada acima e acionada. */
     public int crossFieldThreshold = 20;
 
-    /** Limite de resultados (0 = sem limite). */
     public int maxResults = 0;
 
     public SearchSettings copy() {
@@ -175,7 +92,6 @@ public final class SearchSettings {
         return s;
     }
 
-    /** Corrige valores invalidos vindos do arquivo de configuracao. */
     public void sanitize() {
         typoTolerance = clamp(typoTolerance, 0, 3);
         minTypoLength = clamp(minTypoLength, 3, 10);
@@ -184,10 +100,8 @@ public final class SearchSettings {
         crossFieldThreshold = clamp(crossFieldThreshold, 0, 100_000);
         maxResults = Math.max(0, maxResults);
         if (languages == null) {
-            // Ausente no arquivo -> primeira execucao, usa a lista padrao.
             languages = new ArrayList<>(DEFAULT_LANGUAGES);
         } else {
-            // Lista vazia e uma escolha valida ("nenhum idioma extra"), nao um erro.
             List<String> cleaned = new ArrayList<>();
             for (String raw : languages) {
                 if (raw == null) {
@@ -206,28 +120,10 @@ public final class SearchSettings {
         return languages.contains("*");
     }
 
-    /**
-     * Este idioma deve ser pesquisado agora?
-     *
-     * <p>Conferir isto na hora de montar o indice - e nao so na hora de ler os arquivos -
-     * e o que faz desligar um idioma ter efeito imediato. Sem esta checagem, um idioma
-     * carregado na inicializacao continuaria sendo pesquisado depois de desmarcado.
-     */
     public boolean indexesLanguage(String code) {
         return crossLanguage && (indexesAllLanguages() || languages.contains(code));
     }
 
-    /**
-     * Mudar esta opcao obriga a remontar o indice?
-     *
-     * <p>Isto importa muito mais do que parece. Remontar o indice leva de decimos de segundo
-     * a alguns segundos, e enquanto ele nao fica pronto o mod devolve a busca original -
-     * ou seja, logo depois de mexer numa opcao o mod parecia simplesmente nao funcionar.
-     *
-     * <p>So quatro opcoes mudam o que e <i>guardado</i> no indice. Todo o resto (tolerancia
-     * a erro, iniciais, espacos, limites, ordenacao) e decidido na hora da busca e portanto
-     * vale <b>imediatamente</b>, sem remontar nada.
-     */
     public boolean affectsIndex(SearchSettings other) {
         return crossLanguage != other.crossLanguage
                 || searchTooltips != other.searchTooltips
@@ -239,7 +135,6 @@ public final class SearchSettings {
         return Math.max(min, Math.min(max, v));
     }
 
-    /** Usado pela tela de configuracao para saber se "Desfazer" e "Padroes" fazem diferenca. */
     @Override
     public boolean equals(Object other) {
         if (this == other) {

@@ -8,14 +8,8 @@ import net.minecraft.client.gui.narration.NarratedElementType;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
 
-/**
- * Botao discreto: preto chapado semitransparente, sem borda e sem textura.
- *
- * <p>Usado nos links do rodape, onde um botao vanilla cinza roubaria atencao das opcoes.
- * Ao passar o mouse ele escurece um pouco e o texto assume a cor de destaque do mod.
- */
+// no vanilla button texture: this one is flat so it looks the same on every version
 public final class FlatButton extends AbstractWidget {
-
     private static final int BACKGROUND = 0x66000000;
     private static final int BACKGROUND_HOVER = 0xAA000000;
 
@@ -26,13 +20,12 @@ public final class FlatButton extends AbstractWidget {
         this.onPress = onPress;
     }
 
-    /** Largura sugerida para caber o texto com uma folga confortavel. */
     public static int widthFor(Component label) {
         return Minecraft.getInstance().font.width(label) + 16;
     }
 
     @Override
-    @SuppressWarnings("deprecation") // o NeoForge prefere onClick(x, y, botao), que por padrao chama este
+    @SuppressWarnings("deprecation")
     public void onClick(double mouseX, double mouseY) {
         onPress.run();
     }

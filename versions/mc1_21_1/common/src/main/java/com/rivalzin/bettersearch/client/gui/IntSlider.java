@@ -9,15 +9,8 @@ import java.util.function.IntFunction;
 
 import net.minecraft.network.chat.Component;
 
-/**
- * Slider de numero inteiro com passo fixo.
- *
- * <p>Mostra apenas o valor - "Normal", "3 letras", "Sem limite" - porque o nome da opcao
- * ja aparece a esquerda, na propria linha. Assim o usuario ajusta tudo arrastando, sem
- * nunca precisar digitar um numero.
- */
+// value is stepped, the vanilla slider is 0..1 doubles
 public final class IntSlider extends AbstractSliderButton {
-
     private final int min;
     private final int max;
     private final int step;

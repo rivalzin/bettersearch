@@ -16,17 +16,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
-/**
- * Leitura/escrita da configuracao em JSON.
- *
- * <p>JSON de proposito: e o unico formato que funciona igual em NeoForge, Fabric, Quilt ou
- * qualquer outro loader, sem depender da API de configuracao de nenhum deles. A camada de
- * plataforma so precisa dizer <em>onde</em> fica a pasta de configuracao.
- */
 public final class ConfigIo {
-
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
+    // written into the json so nobody has to read this file to change a setting
     private static final String[] HELP = {
             "Better Search - makes search bars smarter and better.",
             "You do NOT need to edit this file: everything is in the game, on the",
@@ -59,7 +52,7 @@ public final class ConfigIo {
     private ConfigIo() {
     }
 
-    /** Le o arquivo; se nao existir (ou estiver corrompido), cria um com os valores padrao. */
+    // a broken file gives defaults, never an exception into the loader
     public static SearchSettings loadOrCreate(Path file) {
         SearchSettings settings = new SearchSettings();
         if (Files.exists(file)) {
@@ -72,7 +65,7 @@ public final class ConfigIo {
                     }
                 }
             } catch (Exception e) {
-                BetterSearch.LOGGER.warn("[{}] configuracao invalida em {}; usando os valores padrao",
+                BetterSearch.LOGGER.warn("[{}] bad config at {}, using defaults",
                         BetterSearch.MOD_NAME, file, e);
                 settings = new SearchSettings();
             }
@@ -98,7 +91,7 @@ public final class ConfigIo {
                 writer.write(GSON.toJson(out));
             }
         } catch (Exception e) {
-            BetterSearch.LOGGER.warn("[{}] nao consegui salvar a configuracao em {}",
+            BetterSearch.LOGGER.warn("[{}] could not save config to {}",
                     BetterSearch.MOD_NAME, file, e);
         }
     }

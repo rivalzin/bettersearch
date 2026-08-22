@@ -1,7 +1,7 @@
 package com.rivalzin.bettersearch.client.gui;
 
 import com.rivalzin.bettersearch.BetterSearch;
-import com.rivalzin.bettersearch.client.Estado;
+import com.rivalzin.bettersearch.client.ModConfig;
 import com.rivalzin.bettersearch.client.LanguageCatalog;
 import com.rivalzin.bettersearch.core.SearchSettings;
 import net.minecraft.client.gui.GuiButton;
@@ -9,29 +9,12 @@ import net.minecraft.client.gui.GuiConfirmOpenLink;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.util.math.MathHelper;
 
-/**
- * Tela de configuracao do mod, aberta pelo Alt+O.
- *
- * <p>Quatro abas, uma lista de opcoes com o nome a esquerda e o controle a direita, e um
- * painel que explica a opcao sob o cursor e mostra uma foto dela em uso. Nenhum campo de
- * texto: tudo se ajusta com interruptores e sliders, entao nao ha como digitar um valor
- * invalido.
- *
- * <p>A explicacao vem em tres camadas, da mais simples para a mais tecnica: o nome da
- * opcao, a frase no painel da direita e a dica que aparece ao parar o cursor sobre o
- * controle. Quem so quer ligar e desligar nunca precisa passar da primeira.
- *
- * <p>As mudancas so vao para o disco quando a tela e fechada em "Concluido"; "Desfazer"
- * volta para como estava ao abrir e "Padroes" volta para os valores de fabrica.
- */
 public final class BetterSearchConfigScreen extends OptionRowsScreen {
-
     private static final String YOUTUBE_URL = "https://www.youtube.com/@Rivalzln";
     private static final String KOFI_URL = "https://ko-fi.com/rivalzin";
 
     private static final SearchSettings DEFAULTS = new SearchSettings();
 
-    /** Id do dialogo de link no confirmClicked (o GuiScreen desta era despacha por numero). */
     private static final int ID_LINK = 31102009;
 
     private enum Tab {
@@ -57,7 +40,7 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
 
     public BetterSearchConfigScreen(GuiScreen parent) {
         super(ComponentCompat.translatable("bettersearch.config.title"), parent);
-        this.settings = Estado.settings().copy();
+        this.settings = ModConfig.settings().copy();
         this.opened = this.settings.copy();
     }
 
@@ -71,7 +54,6 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
         return 2 * BUTTON_GAP + 4;
     }
 
-    /** Faixa livre no canto inferior esquerdo, onde ficam os dois links. */
     @Override
     protected int listBottomInset() {
         return BUTTON_GAP + 2;
@@ -178,13 +160,7 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
                 addToggle("search_command_items", () -> settings.searchCommandItems,
                         v -> settings.searchCommandItems = v, DEFAULTS.searchCommandItems)
                         .preview(previewOf("search_command_items"));
-                /*
-                 * So o JEI aqui - e a UNICA versao em que a regra "toda opcao de visualizador
-                 * aparece sempre" nao vale, por ordem do dono do mod: REI e EMI nunca
-                 * existiram para a 1.12.2, entao os interruptores nao governariam nada.
-                 * O rotulo diz "JEI & NEI" porque o NEI desta versao (port do covers1624)
-                 * roda em cima do JEI - quem usa o sabor NEI ja e coberto por este gancho.
-                 */
+
                 addToggle("search_jei", () -> settings.searchJei,
                         v -> settings.searchJei = v, DEFAULTS.searchJei);
                 addSlider("command_suggestion_limit", 1, SUGGESTION_LIMIT_MAX, 1,
@@ -230,10 +206,6 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
         updateFooterState();
     }
 
-    /**
-     * Os dois links, discretos, no canto inferior esquerdo da tela - fora da lista de
-     * opcoes, para nao competir com elas.
-     */
     private void buildCornerLinks() {
         String youtube = ComponentCompat.translatable("bettersearch.config.youtube");
         String kofi = ComponentCompat.translatable("bettersearch.config.kofi");
@@ -248,10 +220,6 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
                 () -> openLink(KOFI_URL)));
     }
 
-    /**
-     * "Padroes" e "Desfazer" acendem no instante em que algo muda - inclusive quando a
-     * mudanca veio de um interruptor, que nao reconstroi a tela.
-     */
     @Override
     protected void updateFooterState() {
         if (defaultsButton != null) {
@@ -298,13 +266,6 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
         return ComponentCompat.translatable("bettersearch.config.tagline");
     }
 
-    /**
-     * O dialogo "quer mesmo abrir este link?" das outras versoes existe aqui tambem
-     * ({@code GuiConfirmOpenLink}), mas responde pelo caminho antigo: {@code confirmClicked}
-     * na tela que o abriu, com um id numerico. O {@code true} do construtor e o mesmo
-     * "trusted" do ConfirmLinkScreen de la - some o aviso de golpe, que para os NOSSOS
-     * proprios links seria alarme falso.
-     */
     private void openLink(String url) {
         this.pendingUrl = url;
         this.mc.displayGuiScreen(new GuiConfirmOpenLink(this, url, ID_LINK, true));
@@ -316,7 +277,7 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
             String url = pendingUrl;
             pendingUrl = null;
             if (result && url != null) {
-                abrirNavegador(url);
+                openBrowser(url);
             }
             this.mc.displayGuiScreen(this);
             return;
@@ -324,27 +285,21 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
         super.confirmClicked(result, id);
     }
 
-    /**
-     * O mesmo caminho que o proprio jogo usa para abrir link (GuiScreen.openWebLink):
-     * java.awt.Desktop por reflexao, para nao criar dependencia dura de AWT.
-     */
-    private static void abrirNavegador(String url) {
+    private static void openBrowser(String url) {
         try {
             Class<?> desktop = Class.forName("java.awt.Desktop");
-            Object instancia = desktop.getMethod("getDesktop").invoke(null);
-            desktop.getMethod("browse", java.net.URI.class).invoke(instancia, new java.net.URI(url));
+            Object instance = desktop.getMethod("getDesktop").invoke(null);
+            desktop.getMethod("browse", java.net.URI.class).invoke(instance, new java.net.URI(url));
         } catch (Throwable t) {
-            BetterSearch.LOGGER.warn("[{}] nao consegui abrir o link {}", BetterSearch.MOD_NAME, url, t);
+            BetterSearch.LOGGER.warn("[{}] could not open link {}", BetterSearch.MOD_NAME, url, t);
         }
     }
 
     @Override
     public void onClose() {
-        Estado.aplicarESalvar(settings);
+        ModConfig.apply(settings);
         super.onClose();
     }
-
-    // ------------------------------------------------------------------ rotulos dos sliders
 
     private static String typoToleranceLabel(int value) {
         switch (value) {
@@ -355,19 +310,10 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
         }
     }
 
-    /**
-     * Os dois limites de "quando insistir" viravam numeros crus no slider - "menos de 60" -
-     * e ninguem tinha como saber se 60 era muito ou pouco. Agora o slider anda por cinco
-     * degraus com nome, e o numero que fica guardado no arquivo e este daqui.
-     *
-     * <p>Cada opcao tem a propria escala, montada para que o padrao de fabrica caia
-     * exatamente no meio ("Equilibrado").
-     */
     private static final int[] FUZZY_LEVELS = {0, 20, 60, 150, 100_000};
     private static final int[] CROSS_FIELD_LEVELS = {0, 8, 20, 60, 100_000};
     private static final int EFFORT_STEPS = FUZZY_LEVELS.length - 1;
 
-    /** Em que degrau um valor guardado cai (o mais proximo, para configuracoes editadas a mao). */
     private static int effortLevel(int[] levels, int value) {
         int best = 0;
         int bestDistance = Integer.MAX_VALUE;
@@ -382,15 +328,15 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
     }
 
     private static String effortLabel(int level) {
-        String chave;
+        String key;
         switch (level) {
-            case 0:  chave = "bettersearch.config.value.never";    break;
-            case 1:  chave = "bettersearch.config.value.rarely";   break;
-            case 2:  chave = "bettersearch.config.value.balanced"; break;
-            case 3:  chave = "bettersearch.config.value.often";    break;
-            default: chave = "bettersearch.config.value.always";   break;
+            case 0:  key = "bettersearch.config.value.never";    break;
+            case 1:  key = "bettersearch.config.value.rarely";   break;
+            case 2:  key = "bettersearch.config.value.balanced"; break;
+            case 3:  key = "bettersearch.config.value.often";    break;
+            default: key = "bettersearch.config.value.always";   break;
         }
-        return ComponentCompat.translatable(chave);
+        return ComponentCompat.translatable(key);
     }
 
     private static String resultCountLabel(int value) {
@@ -399,7 +345,6 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
                 : ComponentCompat.literal(Integer.toString(value));
     }
 
-    /** Teto do slider de sugestoes. Chegar nele troca o numero por uma piada. */
     private static final int SUGGESTION_LIMIT_MAX = 30;
 
     private static String suggestionLimitLabel(int value) {

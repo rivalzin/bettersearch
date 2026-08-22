@@ -5,27 +5,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Indice pesquisavel generico.
- *
- * <p>{@code T} e o objeto devolvido pela busca (no mod, um {@code ItemStack}). O indice nao
- * sabe nada sobre Minecraft: quem monta as entradas e a camada de plataforma.
- *
- * <p>A busca acontece em duas passadas:
- * <ol>
- *   <li><b>estrita</b> - exato / prefixo / substring / iniciais. Rapidissima, sem alocacao.</li>
- *   <li><b>aproximada</b> - distancia de edicao, e so roda se a primeira passada devolveu
- *       poucos resultados. Assim quem digita "diamond" nunca paga o custo do algoritmo caro,
- *       e quem digita "dimaond" recebe a ajuda.</li>
- * </ol>
- */
+// entries are flat arrays: one pass per keystroke, no allocation
 public final class SearchIndex<T> {
-
-    /** Uma entrada do indice: o objeto + todos os textos pelos quais ele pode ser achado. */
     public static final class Entry<T> {
         public final T value;
         public final SearchField[] fields;
-        /** Id do mod, normalizado, para o filtro {@code @mod}. Pode ser vazio. */
+
         public final String modId;
 
         public Entry(T value, SearchField[] fields, String modId) {
@@ -61,7 +46,7 @@ public final class SearchIndex<T> {
         return entries;
     }
 
-    /** Executa a busca e devolve os objetos ordenados por relevancia. */
+    // passes run cheapest first and stop as soon as one fills the list
     public List<T> search(SearchQuery query, SearchSettings settings) {
         if (query.isEmpty()) {
             List<T> all = new ArrayList<>(entries.size());
@@ -76,7 +61,6 @@ public final class SearchIndex<T> {
         final int[] scores = new int[n];
         Arrays.fill(scores, Integer.MIN_VALUE);
 
-        // Duas politicas criadas uma vez por busca: dentro do laco nao se aloca nada.
         final MatchPolicy strict = MatchPolicy.of(settings, false);
         final MatchPolicy fuzzy = MatchPolicy.of(settings, true);
 
@@ -84,7 +68,6 @@ public final class SearchIndex<T> {
 
         boolean wantsTypos = settings.typoTolerance > 0;
         if (wantsTypos && hits < settings.fuzzyThreshold) {
-            // Idiomas estrangeiros continuam estritos quando o usuario pediu isso.
             hits += scan(query, settings, scratch, scores,
                     fuzzy, settings.foreignStrictOnly ? strict : fuzzy);
         }
@@ -117,19 +100,13 @@ public final class SearchIndex<T> {
         return out;
     }
 
-    /**
-     * Uma passada sobre o indice. Devolve quantas entradas NOVAS casaram.
-     *
-     * @param policy        politica para nome no idioma do jogo e ingles
-     * @param foreignPolicy politica para os demais idiomas (id e tooltip sempre estritos)
-     */
     private int scan(SearchQuery query, SearchSettings settings, FuzzyMatcher.Scratch scratch,
                      int[] scores, MatchPolicy policy, MatchPolicy foreignPolicy) {
         MatchPolicy strict = new MatchPolicy(false, policy.allowInitials(), policy.allowCompact());
         int found = 0;
         for (int i = 0; i < entries.size(); i++) {
             if (scores[i] != Integer.MIN_VALUE) {
-                continue; // ja casou numa passada anterior
+                continue;
             }
             Entry<T> entry = entries.get(i);
             if (!matchesModFilter(entry, query)) {
@@ -137,7 +114,7 @@ public final class SearchIndex<T> {
             }
             int best = Integer.MIN_VALUE;
             if (query.tokens.length == 0) {
-                best = 0; // consulta so com "@mod"
+                best = 0;
             } else {
                 for (SearchField field : entry.fields) {
                     if (field.source == SearchField.SOURCE_TOOLTIP && !settings.searchTooltips) {
@@ -156,7 +133,7 @@ public final class SearchIndex<T> {
                             fieldPolicy = foreignPolicy;
                             break;
                         default:
-                            fieldPolicy = strict; // id e tooltip nunca aceitam erro de digitacao
+                            fieldPolicy = strict;
                             break;
                     }
                     int score = scoreField(field, query, fieldPolicy, scratch);
@@ -173,12 +150,6 @@ public final class SearchIndex<T> {
         return found;
     }
 
-    /**
-     * Passada de ultimo recurso: cada palavra da consulta pode casar com um campo diferente
-     * do mesmo item. E o que faz "swrod de diamante" (ingles + portugues na mesma frase)
-     * ou "pomme dourada" (frances + portugues) funcionarem. Como e a mais permissiva,
-     * leva uma penalidade fixa e so roda quando quase nada foi encontrado.
-     */
     private int scanCrossField(SearchQuery query, SearchSettings settings, FuzzyMatcher.Scratch scratch,
                                int[] scores, MatchPolicy policy, MatchPolicy foreignPolicy) {
         MatchPolicy strict = new MatchPolicy(false, policy.allowInitials(), policy.allowCompact());
@@ -261,7 +232,6 @@ public final class SearchIndex<T> {
         return true;
     }
 
-    /** Todos os tokens precisam casar com ESTE campo; devolve a pontuacao final. */
     private static int scoreField(SearchField field, SearchQuery query, MatchPolicy policy,
                                   FuzzyMatcher.Scratch scratch) {
         int minTier = Integer.MAX_VALUE;

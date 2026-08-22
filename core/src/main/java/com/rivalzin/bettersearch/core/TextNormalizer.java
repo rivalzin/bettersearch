@@ -1,28 +1,13 @@
 package com.rivalzin.bettersearch.core;
 
+// strips accents so pomme finds pomme and pomme
 import java.text.Normalizer;
 import java.util.Locale;
 
-/**
- * Normalizacao de texto usada por todo o motor de busca.
- *
- * <p>Regras (aplicadas nesta ordem):
- * <ol>
- *   <li>minusculas ({@link Locale#ROOT}, para nao quebrar em turco);</li>
- *   <li>expansao de letras que NAO possuem decomposicao Unicode (ss, ae, oe, o, d, l, ...);</li>
- *   <li>NFKD + remocao de marcas combinantes -> "bau" == "bau", "acucar" == "acucar";</li>
- *   <li>tudo que nao for letra/digito vira espaco;</li>
- *   <li>espacos colapsados e aparados.</li>
- * </ol>
- *
- * <p>Nao ha nenhuma referencia a Minecraft aqui: esta classe compila e roda em Java puro.
- */
 public final class TextNormalizer {
-
     private TextNormalizer() {
     }
 
-    /** Normaliza uma string. Nunca retorna {@code null}. */
     public static String normalize(String input) {
         if (input == null || input.isEmpty()) {
             return "";
@@ -30,54 +15,53 @@ public final class TextNormalizer {
 
         String lower = input.toLowerCase(Locale.ROOT);
 
-        // 1) Expansoes manuais: caracteres sem decomposicao canonica que precisam virar ASCII.
         StringBuilder expanded = new StringBuilder(lower.length() + 4);
         for (int i = 0; i < lower.length(); i++) {
             char c = lower.charAt(i);
             switch (c) {
                 case 'ß':
-                    expanded.append("ss");   // ß  alemao
+                    expanded.append("ss");
                     break;
                 case 'ẞ':
-                    expanded.append("ss");   // ẞ
+                    expanded.append("ss");
                     break;
                 case 'æ':
-                    expanded.append("ae");   // æ
+                    expanded.append("ae");
                     break;
                 case 'œ':
-                    expanded.append("oe");   // œ
+                    expanded.append("oe");
                     break;
                 case 'ø':
-                    expanded.append('o');    // ø  nordico
+                    expanded.append('o');
                     break;
                 case 'đ':
-                    expanded.append('d');    // đ
+                    expanded.append('d');
                     break;
                 case 'ð':
-                    expanded.append('d');    // ð
+                    expanded.append('d');
                     break;
                 case 'þ':
-                    expanded.append("th");   // þ
+                    expanded.append("th");
                     break;
                 case 'ł':
-                    expanded.append('l');    // ł  polones
+                    expanded.append('l');
                     break;
                 case 'ı':
-                    expanded.append('i');    // ı  turco sem ponto
+                    expanded.append('i');
                     break;
                 case 'ħ':
-                    expanded.append('h');    // ħ
+                    expanded.append('h');
                     break;
                 case 'ŋ':
-                    expanded.append('n');    // ŋ
+                    expanded.append('n');
                     break;
                 case 'å':
-                    expanded.append('a');    // å (tem decomposicao, mas antecipamos)
+                    expanded.append('a');
                     break;
                 case 'ʔ':
                 case 'ʼ':
                 case '’':
-                    expanded.append(' '); // apostrofos tipograficos
+                    expanded.append(' ');
                     break;
                 default:
                     expanded.append(c);
@@ -85,10 +69,8 @@ public final class TextNormalizer {
             }
         }
 
-        // 2) NFKD separa a letra base das marcas de acento; removemos as marcas (categoria Mn).
         String decomposed = Normalizer.normalize(expanded, Normalizer.Form.NFKD);
 
-        // 3) Filtro final: mantem letras e digitos, o resto vira separador.
         StringBuilder out = new StringBuilder(decomposed.length());
         boolean pendingSpace = false;
         for (int i = 0; i < decomposed.length(); i++) {
@@ -97,7 +79,7 @@ public final class TextNormalizer {
             if (type == Character.NON_SPACING_MARK
                     || type == Character.COMBINING_SPACING_MARK
                     || type == Character.ENCLOSING_MARK) {
-                continue; // acento solto -> descartado
+                continue;
             }
             if (Character.isLetterOrDigit(c)) {
                 if (pendingSpace && out.length() > 0) {
@@ -112,13 +94,6 @@ public final class TextNormalizer {
         return out.toString();
     }
 
-    /**
-     * Assinatura de 64 bits com os caracteres presentes na string.
-     *
-     * <p>Usada como pre-filtro barato: se a consulta tem caracteres que o alvo nao possui,
-     * a distancia de edicao e no minimo o numero de caracteres faltando. Colisoes so geram
-     * falsos positivos (que o algoritmo real descarta), nunca falsos negativos.
-     */
     public static long charMask(String normalized) {
         long mask = 0L;
         for (int i = 0; i < normalized.length(); i++) {

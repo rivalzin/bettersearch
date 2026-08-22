@@ -9,16 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Lista dos idiomas que o jogo conhece, com o nome bonitinho de cada um.
- *
- * <p>A lista vem do proprio {@code LanguageManager}, entao ela sempre bate com a tela
- * "Idiomas" do Minecraft - inclusive idiomas adicionados por resource packs. Nada e escrito
- * na mao aqui, o que evita codigos errados e mantem o mod correto em qualquer versao.
- */
+// names come from the pack metadata so they read right in their own script
 public final class LanguageCatalog {
-
-    /** @param code por exemplo {@code pt_br}; @param displayName por exemplo "Português (Brasil)" */
     public record Entry(String code, String displayName) {
     }
 
@@ -34,7 +26,7 @@ public final class LanguageCatalog {
                 out.add(new Entry(entry.getKey(), info.name() + " (" + info.region() + ")"));
             }
         } catch (Throwable t) {
-            BetterSearch.LOGGER.warn("[{}] nao consegui listar os idiomas do jogo", BetterSearch.MOD_NAME, t);
+            BetterSearch.LOGGER.warn("[{}] could not list game languages", BetterSearch.MOD_NAME, t);
         }
         if (out.isEmpty()) {
             for (String code : SearchSettings.DEFAULT_LANGUAGES) {
@@ -44,7 +36,6 @@ public final class LanguageCatalog {
         return out;
     }
 
-    /** Codigo do idioma em uso no jogo (usado so para informar o usuario). */
     public static String currentCode() {
         try {
             return Minecraft.getInstance().getLanguageManager().getSelected();

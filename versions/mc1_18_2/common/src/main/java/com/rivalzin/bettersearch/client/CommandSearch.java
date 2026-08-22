@@ -37,41 +37,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
-/**
- * Acrescenta sugestoes as listinhas de autocompletar do chat e dos comandos.
- *
- * <p>Tres coisas acontecem aqui:
- * <ul>
- *   <li><b>Nomes de jogadores</b> com tolerancia a erro: {@code /msg Steev} passa a propor
- *       {@code Steve}. O Minecraft calcula essa lista no proprio cliente (ele conhece a lista
- *       de jogadores), entao funciona tambem em servidor.</li>
- *   <li><b>IDs de item pelo nome traduzido</b>: {@code /give @p bau} propoe
- *       {@code minecraft:chest}.</li>
- *   <li><b>Correcao da palavra errada</b>: {@code /gamemode criativo} passa a propor
- *       {@code creative}. Vale para o nome do comando, para literais no meio ({@code add},
- *       {@code set}), para gamerules e ate para o valor de um {@code type=} dentro de um
- *       seletor - porque quem lista os candidatos e o proprio Brigadier, nao uma tabela
- *       escrita a mao aqui.</li>
- * </ul>
- *
- * <p>Para nao sugerir item onde nao cabe, olhamos qual argumento esta sendo completado:
- * o Brigadier diz qual e o no pai da posicao do cursor, e conferimos o tipo dos argumentos
- * possiveis ali. Assim {@code /time set bau} nao vira uma lista de itens.
- *
- * <p>As sugestoes originais vem sempre primeiro; as nossas sao acrescentadas depois. Se
- * qualquer coisa der errado, devolvemos a lista original intacta.
- */
 public final class CommandSearch {
-
+    // one and two letter words are almost always right, do not "fix" them
     private static final int MIN_WORD_LENGTH = 2;
 
-    /**
-     * Ha uma correcao de comando sendo oferecida agora?
-     *
-     * <p>Serve para uma coisa so: o mixin pinta de dourado, em vez de vermelho, o pedaco do
-     * comando que o jogo nao entendeu <b>quando existe conserto a um TAB de distancia</b>.
-     * Sem conserto, o vermelho continua vermelho - ele esta certo.
-     */
     private static volatile boolean correctionOffered;
 
     private CommandSearch() {
@@ -80,22 +49,16 @@ public final class CommandSearch {
     public static boolean isEnabled() {
         SearchSettings settings = BetterSearchClient.settings();
         return BetterSearchClient.isEnabled()
+                // only the tab list, the server never gets asked
                 && (settings.searchPlayerNames || settings.searchCommandItems
                     || settings.fixCommandErrors);
     }
 
-    /** Vermelho do Minecraft: "isto nao existe e voce esta sem saida". */
+    // red = nothing found, gold = we have a spelling for it
     private static final Style STUCK = Style.EMPTY.withColor(ChatFormatting.RED);
 
-    /** Dourado do mod: "isto ainda nao vale, mas o conserto esta a um TAB daqui". */
     private static final Style FIXABLE = Style.EMPTY.withColor(ChatFormatting.GOLD);
 
-    /**
-     * Cor do trecho que o jogo nao entendeu, usada pelo mixin de {@code formatText}.
-     *
-     * <p>As opcoes sao conferidas aqui, e nao so na hora de gravar a flag: desligar a
-     * correcao no menu devolve o vermelho no quadro seguinte, sem depender de nada.
-     */
     public static Style unparsedStyle() {
         return correctionOffered
                 && BetterSearchClient.isEnabled()
@@ -103,7 +66,6 @@ public final class CommandSearch {
                 ? FIXABLE : STUCK;
     }
 
-    /** Caminho dos comandos: sabemos exatamente que argumento esta sendo completado. */
     public static Suggestions augmentCommand(ParseResults<SharedSuggestionProvider> parse,
                                              int cursor, Suggestions original) {
         try {
@@ -154,25 +116,12 @@ public final class CommandSearch {
             }
             return merge(original, additions, start, safeCursor, settings);
         } catch (Throwable t) {
-            BetterSearch.LOGGER.debug("[{}] sugestoes de comando inalteradas: {}",
+            BetterSearch.LOGGER.debug("[{}] command suggestions unchanged: {}",
                     BetterSearch.MOD_NAME, t.toString());
             return original;
         }
     }
 
-    // ------------------------------------------------------------------ correcao de comandos
-
-    /**
-     * O caminho dos comandos, agora em duas etapas.
-     *
-     * <p>Primeiro o acrescimo normal (nomes de jogador, ids de item). Se depois disso a lista
-     * ainda estiver vazia, o jogo nao soube o que sugerir - e ai entra a correcao.
-     *
-     * <p>Ela devolve um {@code CompletableFuture} porque precisa perguntar ao Brigadier quais
-     * opcoes seriam validas naquele ponto, e essa pergunta as vezes vai ate o servidor (nomes
-     * de time, objetivos de placar...). Esperar a resposta travaria a thread principal, entao
-     * a espera e encadeada em vez de bloqueante.
-     */
     public static CompletableFuture<Suggestions> augmentCommandAsync(
             ParseResults<SharedSuggestionProvider> parse, int cursor, Suggestions original) {
         try {
@@ -186,7 +135,7 @@ public final class CommandSearch {
             return correct(parse, cursor, merged);
         } catch (Throwable t) {
             correctionOffered = false;
-            BetterSearch.LOGGER.debug("[{}] correcao de comando ignorada: {}",
+            BetterSearch.LOGGER.debug("[{}] command fix skipped: {}",
                     BetterSearch.MOD_NAME, t.toString());
             return CompletableFuture.completedFuture(original);
         }
@@ -211,10 +160,6 @@ public final class CommandSearch {
         final int end = span[1];
         final String word = input.substring(start, end);
 
-        // A pergunta que interessa: "com esta palavra fora do caminho, o que caberia aqui?"
-        // O Brigadier responde isso sozinho, entao vale para o nome do comando, para um
-        // literal no meio (add, set), para um gamerule e ate para o valor de um type= dentro
-        // de um seletor - sem lista nenhuma escrita a mao.
         CommandDispatcher<SharedSuggestionProvider> dispatcher = minecraft.player.connection.getCommands();
         StringReader reader = new StringReader(input.substring(0, start));
         if (reader.canRead() && reader.peek() == '/') {
@@ -256,14 +201,6 @@ public final class CommandSearch {
         return new Suggestions(range, corrected);
     }
 
-    /**
-     * Qual palavra esta errada: {@code [inicio, fim]}, ou {@code null} se nao houver uma.
-     *
-     * <p>Quando o comando nao compila, o Brigadier guarda em que posicao ele desistiu - e e
-     * essa a palavra a consertar, mesmo que o cursor ja tenha passado dela. Sem isto,
-     * {@code /gamemode criativo @a} ficaria vermelho para sempre: o cursor esta no
-     * {@code @a}, que esta certo, enquanto o erro ficou tres palavras atras.
-     */
     private static int[] wrongWord(String input, int cursor, ParseResults<SharedSuggestionProvider> parse) {
         int at = cursor;
         Map<CommandNode<SharedSuggestionProvider>, CommandSyntaxException> errors = parse.getExceptions();
@@ -281,8 +218,7 @@ public final class CommandSearch {
         if (end > input.length()) {
             end = input.length();
         }
-        // Nunca invadir a palavra seguinte: o fim so pode passar do cursor se ainda estiver
-        // dentro da mesma palavra.
+
         end = Math.min(end, CommandFuzzy.wordEnd(input, start));
         if (end - start < MIN_WORD_LENGTH) {
             return null;
@@ -290,9 +226,8 @@ public final class CommandSearch {
         return new int[]{start, end};
     }
 
-    /** Caminho do chat comum (sem barra): a lista e sempre de nomes de jogadores/times. */
     public static Suggestions augmentChat(String input, int cursor, Suggestions original) {
-        correctionOffered = false; // sem comando na linha, nao ha nada para consertar
+        correctionOffered = false;
         try {
             SearchSettings settings = BetterSearchClient.settings();
             if (!BetterSearchClient.isEnabled() || !settings.searchPlayerNames || original == null) {
@@ -308,19 +243,15 @@ public final class CommandSearch {
             if (minecraft == null || minecraft.player == null) {
                 return original;
             }
-            // 1.18.2: nao existe getCustomTabSugggestions (com o erro de digitacao e tudo).
-            // Os nomes de jogador vem de getOnlinePlayerNames, que e o que aquele metodo
-            // acabaria devolvendo aqui de qualquer forma.
+
             Collection<String> pool = minecraft.player.connection.getSuggestionsProvider().getOnlinePlayerNames();
             return merge(original, matchNames(pool, word, settings), start, safeCursor, settings);
         } catch (Throwable t) {
-            BetterSearch.LOGGER.debug("[{}] sugestoes de chat inalteradas: {}",
+            BetterSearch.LOGGER.debug("[{}] chat suggestions unchanged: {}",
                     BetterSearch.MOD_NAME, t.toString());
             return original;
         }
     }
-
-    // ------------------------------------------------------------------ auxiliares
 
     private static boolean isItemLike(ArgumentType<?> type) {
         return type instanceof ItemArgument
@@ -335,23 +266,9 @@ public final class CommandSearch {
                 || type instanceof ScoreHolderArgument;
     }
 
-    /**
-     * Comandos de party que nao passam pelo Brigadier.
-     *
-     * <p>O {@link #isPlayerLike} resolve o caso vanilla, em que o proprio jogo diz que aquele
-     * argumento e um jogador. Em servidor com plugin isso nao acontece: {@code /party} e
-     * {@code /invite} chegam ao cliente como um argumento de texto solto, quando chegam, e o
-     * Brigadier nao tem como saber que ali cabe um nome. Sobra ir pelo nome do comando.
-     */
     private static final Set<String> PARTY_COMMANDS =
             Set.of("invite", "group", "grupo", "party");
 
-    /**
-     * Comeco da palavra que esta sendo digitada, se o comando for um dos de party.
-     *
-     * <p>Devolve -1 quando nao e o caso. Pega tanto {@code /party invite <nome>} quanto
-     * {@code /party <nome>}, porque o recorte e sempre a ultima palavra antes do cursor.
-     */
     private static int partyTargetStart(String input, int cursor) {
         int begin = input.startsWith("/") ? 1 : 0;
         int space = input.indexOf(' ', begin);
@@ -372,7 +289,6 @@ public final class CommandSearch {
         return minecraft.player.connection.getSuggestionsProvider().getOnlinePlayerNames();
     }
 
-    /** Nomes que casam, do mais parecido para o menos. */
     private static List<String> matchNames(Collection<String> pool, String word, SearchSettings settings) {
         QuickMatcher.Session session = new QuickMatcher.Session(word, settings);
         List<String> matched = new ArrayList<>();
@@ -417,7 +333,6 @@ public final class CommandSearch {
         return added == 0 ? original : new Suggestions(range, merged);
     }
 
-    /** Inicio da ultima palavra antes do cursor (equivalente ao que o chat vanilla faz). */
     private static int lastWordIndex(String text, int cursor) {
         int index = cursor;
         while (index > 0 && !Character.isWhitespace(text.charAt(index - 1))) {

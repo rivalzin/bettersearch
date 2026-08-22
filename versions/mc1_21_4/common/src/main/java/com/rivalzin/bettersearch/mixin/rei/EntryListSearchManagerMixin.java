@@ -13,22 +13,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
 
-/**
- * O segundo gancho no REI: decide EM QUE ORDEM aparece.
- *
- * <p>{@code copyAndOrder} e onde o REI aplica a ordenacao dele (registro, nome, grupos) na lista
- * ja filtrada. A pontuacao de cada entrada foi calculada na passada do filtro, entao aqui e so
- * reaproveitar - sem buscar de novo.
- *
- * <p>A pontuacao e pedida ao filtro que esta valendo AGORA, e nao a um campo global. Sem isso, uma
- * consulta poderia ser ordenada com a pontuacao da anterior no meio da digitacao.
- *
- * <p>So age com "ordenar por relevancia" ligado no menu. Desligado, {@code reorder} devolve
- * {@code null} e a ordem escolhida na configuracao do REI fica exatamente como estava.
- */
 @Mixin(value = EntryListSearchManager.class, remap = false)
 public abstract class EntryListSearchManagerMixin {
-
     @Shadow
     @Final
     private AsyncSearchManager searchManager;

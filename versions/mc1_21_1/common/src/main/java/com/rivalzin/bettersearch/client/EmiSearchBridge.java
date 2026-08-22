@@ -19,45 +19,19 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/**
- * A busca do Better Search dentro da lista do EMI.
- *
- * <p>Mesma correcao do {@link JeiSearch}: na 1.5 isto era um socorro com um comparador reduzido,
- * agora e o motor de verdade, com o indice montado pelo mesmo {@link CreativeIndexBuilder#fill}
- * do criativo. Toda opcao do menu vale aqui porque quem decide e o mesmo {@link SearchIndex}.
- *
- * <p>A diferenca para o JEI e so onde o trabalho acontece. <b>O EMI ja busca fora da thread do
- * jogo</b> - o gancho roda na {@code searchThread} dele - entao o indice e montado ali mesmo, na
- * hora, sem {@code CompletableFuture} e sem o problema de cache velho. Enquanto a primeira busca
- * monta o indice, a lista anterior continua na tela, que e como o EMI ja se comporta sozinho.
- */
 public final class EmiSearchBridge {
-
-    /**
-     * Sintaxe que e do EMI e nao minha: {@code #} tooltip, {@code $} tag, {@code /} regex e
-     * {@code |} para OU. Vendo qualquer uma delas eu devolvo a lista dele intacta.
-     *
-     * <p>O {@code @} fica de fora: filtro de mod os dois temos, e o nosso perdoa erro no nome.
-     */
     private static final String EMI_SYNTAX = "#$/|";
 
     private static volatile SearchIndex<EmiIngredient> index;
     private static volatile int indexedSize = -1;
+    // EMI caches its own list, rebuild when the settings stamp moves
     private static volatile long indexedStamp = Long.MIN_VALUE;
 
     static {
-        /*
-         * O EMI guarda o texto digitado e a ULTIMA lista computada (EmiSearch.stacks);
-         * nada o faz recomputar quando a NOSSA configuracao muda - desligar o interruptor
-         * parecia nao fazer nada ate o texto mudar (bug de campo, Cobblemon 1.21.1).
-         * update() refaz a consulta atual; com o gate desligado, a lista volta a ser 100%%
-         * do EMI na hora. javap no jar 1.21.1: public static void update().
-         */
         BetterSearchClient.onSettingsApplied(() -> {
             try {
                 EmiSearch.update();
             } catch (Throwable ignored) {
-                // sem tela do EMI aberta nao ha o que refazer
             }
         });
     }
@@ -71,12 +45,6 @@ public final class EmiSearchBridge {
         indexedStamp = Long.MIN_VALUE;
     }
 
-    /**
-     * @param query  o texto que o jogador digitou
-     * @param result o que o EMI achou sozinho, que nunca e jogado fora
-     * @param source a lista completa, que o proprio worker ja tinha em maos
-     * @return a lista que substitui a do EMI, ou {@code null} para deixar a dele em paz
-     */
     public static List<? extends EmiIngredient> search(String query,
                                                        List<? extends EmiIngredient> result,
                                                        List<? extends EmiIngredient> source) {
@@ -106,8 +74,6 @@ public final class EmiSearchBridge {
                 return ours.isEmpty() ? null : List.copyOf(ours);
             }
 
-            // O que o EMI achou sozinho nunca se perde: ele procura em campos que o mod nao
-            // guarda, entao a lista final e sempre um superconjunto da dele.
             List<EmiIngredient> merged = new ArrayList<>(ours.size() + result.size());
             if (settings.sortByRelevance) {
                 Set<EmiIngredient> seen = new HashSet<>(ours);
@@ -128,18 +94,12 @@ public final class EmiSearchBridge {
             }
             return List.copyOf(merged);
         } catch (Throwable t) {
-            BetterSearch.LOGGER.debug("[{}] busca do EMI inalterada: {}",
+            BetterSearch.LOGGER.debug("[{}] EMI search left untouched: {}",
                     BetterSearch.MOD_NAME, t.toString());
             return null;
         }
     }
 
-    /**
-     * Monta o indice na hora, na propria thread de busca do EMI.
-     *
-     * <p>Sem assincronia de proposito: ja estamos fora da thread do jogo, entao a unica coisa que
-     * esta montagem atrasa e esta busca.
-     */
     private static SearchIndex<EmiIngredient> ensureIndex(List<? extends EmiIngredient> source,
                                                           SearchSettings settings) {
         long stamp = BetterSearchClient.languageStamp();
@@ -173,13 +133,13 @@ public final class EmiSearchBridge {
                     entries.add(builder.build());
                 }
             } catch (Throwable t) {
-                BetterSearch.LOGGER.debug("[{}] ingrediente do EMI ignorado no indice: {}",
+                BetterSearch.LOGGER.debug("[{}] skipped EMI ingredient: {}",
                         BetterSearch.MOD_NAME, t.toString());
             }
         }
 
         SearchIndex<EmiIngredient> built = new SearchIndex<>(entries);
-        BetterSearch.LOGGER.info("[{}] indice do EMI pronto: {} de {} ingredientes em {} ms",
+        BetterSearch.LOGGER.info("[{}] EMI index ready: {} of {} ingredients in {} ms",
                 BetterSearch.MOD_NAME, entries.size(), source.size(),
                 (System.nanoTime() - start) / 1_000_000);
         index = built;
@@ -188,7 +148,6 @@ public final class EmiSearchBridge {
         return built;
     }
 
-    /** Fluido, ou o tipo proprio de algum mod: sobra o que o EMI sabe dizer de qualquer um. */
     private static void fillOther(EntryBuilder<EmiIngredient> builder, EmiIngredient ingredient,
                                   SearchSettings settings) {
         List<EmiStack> stacks = ingredient.getEmiStacks();

@@ -16,19 +16,7 @@ import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.nio.file.Path;
 
-/**
- * Gemeo exato do {@code BetterSearchNeoForge} e do {@code BetterSearchFabric}, com a API do
- * Forge 1.20.1.
- *
- * <p>Faz as mesmas quatro coisas, na mesma ordem: acha a pasta de configuracao, carrega a
- * configuracao, registra o listener que le os arquivos de idioma e liga as duas portas de
- * entrada da tela (o botao na lista de mods e o atalho Alt+O).
- *
- * <p>Todo o resto do mod - motor de busca, telas, mixins - e <b>o mesmo arquivo</b> que o
- * Fabric compila. E por isso que esta classe e tao curta: a camada de loader e 2% do mod.
- */
 final class ForgeClientBootstrap {
-
     private ForgeClientBootstrap() {
     }
 
@@ -40,18 +28,16 @@ final class ForgeClientBootstrap {
 
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         modEventBus.addListener(ForgeClientBootstrap::onRegisterClientReloadListeners);
-        // 1.18.2: a tecla nao vem por evento; registra-se direto (veja BetterSearchForgeKeys).
+
         BetterSearchForgeKeys.register();
 
-        // Duas portas de entrada para a mesma tela: o botao "Config" ao lado do mod na lista
-        // de mods, e o atalho Alt+O, que nao depende de nada.
         ModLoadingContext.get().registerExtensionPoint(
                 ConfigGuiHandler.ConfigGuiFactory.class,
                 () -> new ConfigGuiHandler.ConfigGuiFactory(
                         (minecraft, parent) -> new BetterSearchConfigScreen(parent)));
         MinecraftForge.EVENT_BUS.addListener(BetterSearchForgeKeys::onClientTick);
 
-        BetterSearch.LOGGER.info("[{}] carregado. Configuracao: {}", BetterSearch.MOD_NAME, configFile);
+        BetterSearch.LOGGER.info("[{}] loaded, config: {}", BetterSearch.MOD_NAME, configFile);
     }
 
     private static void onRegisterClientReloadListeners(RegisterClientReloadListenersEvent event) {

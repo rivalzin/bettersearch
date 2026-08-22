@@ -3,22 +3,16 @@ package com.rivalzin.bettersearch.core;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Consulta ja normalizada e dividida em tokens.
- *
- * <p>Tokens iniciados por {@code @} viram filtros de mod ({@code @create sword}).
- * O prefixo {@code #} (tags) continua sendo tratado pelo jogo original.
- */
+// parsed once per keystroke, then reused for every item
 public final class SearchQuery {
-
     public final String raw;
-    /** Tokens normalizados que precisam casar com o nome/id do item. */
+
     public final String[] tokens;
-    /** Mascara de caracteres de cada token. */
+
     public final long[] tokenMasks;
-    /** Filtros de mod (sem o {@code @}). Vazio se nao houver. */
+
     public final String[] modFilters;
-    /** Distancia maxima de edicao permitida por token. */
+
     public final int[] maxDistances;
 
     private SearchQuery(String raw, String[] tokens, long[] masks, int[] maxDistances, String[] modFilters) {
@@ -39,7 +33,6 @@ public final class SearchQuery {
         List<String> tokens = new ArrayList<>(4);
         List<String> mods = new ArrayList<>(1);
 
-        // O '@' e removido pela normalizacao, entao detectamos os filtros de mod no texto cru.
         boolean hasModFilter = settings.searchModIds && rawQuery.indexOf('@') >= 0;
         if (hasModFilter) {
             for (String piece : rawQuery.split("\\s+")) {
@@ -64,9 +57,7 @@ public final class SearchQuery {
         int[] distances = new int[tokenArray.length];
         for (int i = 0; i < tokenArray.length; i++) {
             masks[i] = TextNormalizer.charMask(tokenArray[i]);
-            // Um unico portao de tamanho (minTypoLength) e um unico portao de quantidade
-            // (typoTolerance). Antes os dois se sobrepunham e "Baixa" e "Normal" davam o
-            // mesmo resultado na maioria das palavras.
+
             distances[i] = tokenArray[i].length() < settings.minTypoLength
                     ? 0
                     : maxDistance(tokenArray[i].length(), settings.typoTolerance);
@@ -90,16 +81,12 @@ public final class SearchQuery {
         }
     }
 
-    /**
-     * Quantos erros de digitacao sao aceitos para um token deste tamanho.
-     * Palavras curtas nao ganham tolerancia (senao "ar" casaria com meio jogo).
-     */
     public static int maxDistance(int length, int tolerance) {
         switch (tolerance) {
-            case 1:  return 1;                       // Baixa:  1 erro sempre
-            case 2:  return length >= 8 ? 2 : 1;     // Normal: 1 erro, 2 em palavras de 8+ letras
-            case 3:  return length >= 12 ? 3 : 2;    // Alta:   2 erros, 3 em palavras de 12+
-            default: return 0;                       // Desligada
+            case 1:  return 1;
+            case 2:  return length >= 8 ? 2 : 1;
+            case 3:  return length >= 12 ? 3 : 2;
+            default: return 0;
         }
     }
 }

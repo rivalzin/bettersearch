@@ -1,14 +1,7 @@
 package com.rivalzin.bettersearch.client.gui;
 
-/**
- * Todas as cores da interface em um lugar so.
- *
- * <p>Ter isso centralizado e o que mantem as duas telas parecendo a mesma coisa, e permite
- * mudar a identidade visual do mod inteiro editando um arquivo.
- */
+// colors live here so the 1.7.10 gui can reuse them without GuiGraphics
 public final class Theme {
-
-    /** Ciano da lupa do icone: e a cor de destaque do mod. */
     public static final int ACCENT = 0xFF6FD9E8;
 
     public static final int TITLE = 0xFFFFFFFF;
@@ -34,14 +27,12 @@ public final class Theme {
     public static final int SCROLL_TRACK = 0x66000000;
     public static final int SCROLL_THUMB = 0xFFBFBFBF;
 
-    /** Moldura da previa da opcao, no pe do painel da direita. */
     public static final int FRAME_BG = 0x99000000;
     public static final int FRAME_BORDER = 0x556FD9E8;
 
     private Theme() {
     }
 
-    /** Interpola duas cores ARGB. Usado na animacao do interruptor. */
     public static int blend(int from, int to, float t) {
         float clamped = t < 0f ? 0f : (t > 1f ? 1f : t);
         int a = channel(from, 24, to, clamped);

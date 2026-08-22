@@ -10,23 +10,7 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 
-/**
- * Tela de configuracao do mod, aberta pelo botao "Config" na lista de mods ou pelo atalho.
- *
- * <p>Quatro abas, uma lista de opcoes com o nome a esquerda e o controle a direita, e um
- * painel que explica a opcao sob o cursor e mostra uma foto dela em uso. Nenhum campo de
- * texto: tudo se ajusta com interruptores e sliders, entao nao ha como digitar um valor
- * invalido.
- *
- * <p>A explicacao vem em tres camadas, da mais simples para a mais tecnica: o nome da
- * opcao, a frase no painel da direita e a dica que aparece ao parar o cursor sobre o
- * controle. Quem so quer ligar e desligar nunca precisa passar da primeira.
- *
- * <p>As mudancas so vao para o disco quando a tela e fechada em "Concluido"; "Desfazer"
- * volta para como estava ao abrir e "Padroes" volta para os valores de fabrica.
- */
 public final class BetterSearchConfigScreen extends OptionRowsScreen {
-
     private static final String YOUTUBE_URL = "https://www.youtube.com/@Rivalzln";
     private static final String KOFI_URL = "https://ko-fi.com/rivalzin";
 
@@ -68,7 +52,6 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
         return 2 * BUTTON_GAP + 4;
     }
 
-    /** Faixa livre no canto inferior esquerdo, onde ficam os dois links. */
     @Override
     protected int listBottomInset() {
         return BUTTON_GAP + 2;
@@ -224,10 +207,6 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
         updateFooterState();
     }
 
-    /**
-     * Os dois links, discretos, no canto inferior esquerdo da tela - fora da lista de
-     * opcoes, para nao competir com elas.
-     */
     private void buildCornerLinks() {
         Component youtube = ComponentCompat.translatable("bettersearch.config.youtube");
         Component kofi = ComponentCompat.translatable("bettersearch.config.kofi");
@@ -242,10 +221,6 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
                 () -> openLink(KOFI_URL)));
     }
 
-    /**
-     * "Padroes" e "Desfazer" acendem no instante em que algo muda - inclusive quando a
-     * mudanca veio de um interruptor, que nao reconstroi a tela.
-     */
     @Override
     protected void updateFooterState() {
         if (defaultsButton != null) {
@@ -303,11 +278,10 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
 
     @Override
     public void onClose() {
+        // saved on close, not on every click
         BetterSearchClient.applyAndSave(settings);
         super.onClose();
     }
-
-    // ------------------------------------------------------------------ rotulos dos sliders
 
     private static Component typoToleranceLabel(int value) {
         switch (value) {
@@ -318,19 +292,10 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
         }
     }
 
-    /**
-     * Os dois limites de "quando insistir" viravam numeros crus no slider - "menos de 60" -
-     * e ninguem tinha como saber se 60 era muito ou pouco. Agora o slider anda por cinco
-     * degraus com nome, e o numero que fica guardado no arquivo e este daqui.
-     *
-     * <p>Cada opcao tem a propria escala, montada para que o padrao de fabrica caia
-     * exatamente no meio ("Equilibrado").
-     */
     private static final int[] FUZZY_LEVELS = {0, 20, 60, 150, 100_000};
     private static final int[] CROSS_FIELD_LEVELS = {0, 8, 20, 60, 100_000};
     private static final int EFFORT_STEPS = FUZZY_LEVELS.length - 1;
 
-    /** Em que degrau um valor guardado cai (o mais proximo, para configuracoes editadas a mao). */
     private static int effortLevel(int[] levels, int value) {
         int best = 0;
         int bestDistance = Integer.MAX_VALUE;
@@ -345,15 +310,15 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
     }
 
     private static Component effortLabel(int level) {
-        String chave;
+        String key;
         switch (level) {
-            case 0:  chave = "bettersearch.config.value.never";    break;
-            case 1:  chave = "bettersearch.config.value.rarely";   break;
-            case 2:  chave = "bettersearch.config.value.balanced"; break;
-            case 3:  chave = "bettersearch.config.value.often";    break;
-            default: chave = "bettersearch.config.value.always";   break;
+            case 0:  key = "bettersearch.config.value.never";    break;
+            case 1:  key = "bettersearch.config.value.rarely";   break;
+            case 2:  key = "bettersearch.config.value.balanced"; break;
+            case 3:  key = "bettersearch.config.value.often";    break;
+            default: key = "bettersearch.config.value.always";   break;
         }
-        return ComponentCompat.translatable(chave);
+        return ComponentCompat.translatable(key);
     }
 
     private static Component resultCountLabel(int value) {
@@ -362,7 +327,6 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
                 : ComponentCompat.literal(Integer.toString(value));
     }
 
-    /** Teto do slider de sugestoes. Chegar nele troca o numero por uma piada. */
     private static final int SUGGESTION_LIMIT_MAX = 30;
 
     private static Component suggestionLimitLabel(int value) {

@@ -8,33 +8,17 @@ import net.minecraft.util.math.MathHelper;
 import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
 
-/**
- * Slider de numero inteiro com passo fixo.
- *
- * <p>Mostra apenas o valor - "Normal", "3 letras", "Sem limite" - porque o nome da opcao
- * ja aparece a esquerda, na propria linha. Assim o usuario ajusta tudo arrastando, sem
- * nunca precisar digitar um numero.
- *
- * <p>Nas outras versoes isto herda do {@code AbstractSliderButton}; a 1.12.2 nao tem slider
- * generico (o {@code GuiOptionSlider} vanilla e casado com o GameSettings), entao o
- * comportamento dele e reproduzido aqui em cima do {@code GuiButton}, do jeito que o proprio
- * jogo faz: {@code mousePressed} agarra, {@code mouseDragged} - que o {@code drawButton}
- * vanilla chama a cada quadro - arrasta e desenha o botao por cima, {@code mouseReleased}
- * solta. A trilha e o botao usam a MESMA textura widgets.png do slider vanilla, entao a cara
- * e identica a do AbstractSliderButton de la.
- */
+// value is stepped, the vanilla slider is 0..1 doubles
 public final class IntSlider extends GuiButton {
-
     private final int min;
     private final int max;
     private final int step;
     private final IntFunction<String> valueLabel;
     private final IntConsumer onChange;
 
-    /** Fracao 0..1, como o {@code value} do AbstractSliderButton. */
     private double value;
     private boolean dragging;
-    /** Ultimo valor entregue ao onChange - o slider so avisa quando o INTEIRO muda. */
+
     private int lastApplied;
 
     public IntSlider(int x, int y, int width, int height,
@@ -75,10 +59,6 @@ public final class IntSlider extends GuiButton {
         updateMessage();
     }
 
-    /**
-     * Trilha sempre com a textura "apagada" (v=46), exatamente como o slider vanilla faz -
-     * e o mesmo visual que o AbstractSliderButton das outras versoes escolhe para a trilha.
-     */
     @Override
     protected int getHoverState(boolean mouseOver) {
         return 0;
@@ -94,11 +74,6 @@ public final class IntSlider extends GuiButton {
         return false;
     }
 
-    /**
-     * O {@code drawButton} vanilla chama isto a cada quadro, depois de desenhar a trilha e o
-     * texto - e aqui que o slider vanilla arrasta e desenha o botao. Copiamos o desenho dele
-     * (widgets.png, 0/66 + 196/66) no ponto da fracao crua, como o AbstractSliderButton.
-     */
     @Override
     protected void mouseDragged(Minecraft mc, int mouseX, int mouseY) {
         if (!this.visible) {

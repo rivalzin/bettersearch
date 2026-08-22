@@ -3,57 +3,33 @@ package com.rivalzin.bettersearch.client;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Apelidos secretos: palavras que fazem certos itens aparecerem na busca do Criativo.
- *
- * <p>Sao so mais um texto pesquisavel colado no item, do mesmo jeito que o nome dele em
- * outro idioma. Nao ha atalho nem caso especial em lugar nenhum do motor de busca: por isso
- * eles herdam tudo de graca - tolerancia a erro, prefixo, ordenacao por relevancia - e nao
- * custam nada quando ninguem os digita.
- *
- * <p>Nao tem opcao propria no menu. Somem junto com o mod inteiro e mais nada.
- */
 public final class EasterEggs {
+    private static final Map<String, List<String>> ALWAYS = Collections2.map(
 
-    /**
-     * Apelidos que valem sempre.
-     *
-     * <p>A tabela e por <b>item</b>, e nao por palavra, porque e assim que o indice e
-     * montado: um item de cada vez. Uma mesma palavra em varios itens faz os varios
-     * aparecerem juntos.
-     *
-     * <p>{@code Map.ofEntries} e nao {@code Map.of} porque este ultimo para em dez pares.
-     */
-    private static final Map<String, List<String>> ALWAYS = Colecoes.mapa(
-            // Technoblade never dies.
-            Colecoes.par("minecraft:pig_spawn_egg", Colecoes.lista("technoblade")),
-            Colecoes.par("minecraft:potato", Colecoes.lista("technoblade")),
-            Colecoes.par("minecraft:golden_helmet", Colecoes.lista("technoblade")),
-            Colecoes.par("minecraft:red_bed", Colecoes.lista("technoblade")),
+            Collections2.pair("minecraft:pig_spawn_egg", Collections2.list("technoblade")),
+            Collections2.pair("minecraft:potato", Collections2.list("technoblade")),
+            Collections2.pair("minecraft:golden_helmet", Collections2.list("technoblade")),
+            Collections2.pair("minecraft:red_bed", Collections2.list("technoblade")),
 
-            Colecoes.par("minecraft:spider_spawn_egg", Colecoes.lista("venomextreme", "venoninho", "venom extreme")),
-            Colecoes.par("minecraft:gold_ingot", Colecoes.lista("venomextreme", "venoninho", "venom extreme")),
-            Colecoes.par("minecraft:arrow", Colecoes.lista("venomextreme", "venoninho", "venom extreme")),
+            Collections2.pair("minecraft:spider_spawn_egg", Collections2.list("venomextreme", "venoninho", "venom extreme")),
+            Collections2.pair("minecraft:gold_ingot", Collections2.list("venomextreme", "venoninho", "venom extreme")),
+            Collections2.pair("minecraft:arrow", Collections2.list("venomextreme", "venoninho", "venom extreme")),
 
-            Colecoes.par("minecraft:cat_spawn_egg", Colecoes.lista("rival", "rivalzin")),
-            Colecoes.par("minecraft:music_disc_wait", Colecoes.lista("rival", "rivalzin")),
+            Collections2.pair("minecraft:cat_spawn_egg", Collections2.list("rival", "rivalzin")),
+            Collections2.pair("minecraft:music_disc_wait", Collections2.list("rival", "rivalzin")),
 
-            Colecoes.par("minecraft:fox_spawn_egg", Colecoes.lista("spacey", "spaceybubs", "xspaceybubs")),
-            Colecoes.par("minecraft:brush", Colecoes.lista("spacey", "spaceybubs", "xspaceybubs")),
-            Colecoes.par("minecraft:yellow_dye", Colecoes.lista("spacey", "spaceybubs", "xspaceybubs")));
+            Collections2.pair("minecraft:fox_spawn_egg", Collections2.list("spacey", "spaceybubs", "xspaceybubs")),
+            Collections2.pair("minecraft:brush", Collections2.list("spacey", "spaceybubs", "xspaceybubs")),
+            Collections2.pair("minecraft:yellow_dye", Collections2.list("spacey", "spaceybubs", "xspaceybubs")));
 
-    /**
-     * Apelidos que so entram com o ingles ligado - sao nomes ingleses, e apareceriam do nada
-     * para quem desligou o idioma de proposito.
-     */
-    private static final Map<String, List<String>> ENGLISH = Colecoes.mapa(
-            // Como a Bancada de Trabalho se chamava antes da 1.13.
-            Colecoes.par("minecraft:crafting_table", Colecoes.lista("workbench")));
+    // these only fire when english is being searched, otherwise they collide
+    private static final Map<String, List<String>> ENGLISH = Collections2.map(
+
+            Collections2.pair("minecraft:crafting_table", Collections2.list("workbench")));
 
     private EasterEggs() {
     }
 
-    /** Apelidos deste item, ou lista vazia. */
     public static List<String> aliasesFor(String itemId, boolean englishSearched) {
         List<String> always = ALWAYS.get(itemId);
         List<String> english = englishSearched ? ENGLISH.get(itemId) : null;

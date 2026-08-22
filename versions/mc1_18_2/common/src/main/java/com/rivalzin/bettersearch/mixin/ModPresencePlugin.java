@@ -7,18 +7,6 @@ import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 import java.util.List;
 import java.util.Set;
 
-/**
- * Base dos plugins que so aplicam um gancho quando o mod alvo esta instalado.
- *
- * <p><b>Nao use {@code Class.forName} para isso.</b> Ja usei, no primeiro gancho do JEI, e estava
- * errado por dois motivos. O primeiro: isto roda no bootstrap do Mixin, antes das classes de mod
- * ficarem alcancaveis por este carregador, entao a checagem falha mesmo com o mod instalado e o
- * gancho nunca e aplicado, silenciosamente. O segundo e pior: se funcionasse, teria carregado a
- * classe alvo ANTES do Mixin transformar ela, o que mata o gancho de vez.
- *
- * <p>Quem sabe a resposta e o loader, e ele ja esta de pe nesta altura. A cadeia de reflexao
- * abaixo cobre NeoForge, Forge e Fabric com um arquivo so.
- */
 public abstract class ModPresencePlugin implements IMixinConfigPlugin {
     private final String modId;
     private final String targetResource;
@@ -57,9 +45,8 @@ public abstract class ModPresencePlugin implements IMixinConfigPlugin {
             Object loaded = loader.getMethod("isModLoaded", String.class).invoke(instance, modId);
             return Boolean.TRUE.equals(loaded);
         } catch (Throwable ignored) {
-            // nao e Fabric, ou o loader mudou de nome
         }
-        // ultimo recurso: procura o arquivo, sem carregar a classe
+
         return getClass().getClassLoader().getResource(targetResource) != null;
     }
 
@@ -90,6 +77,7 @@ public abstract class ModPresencePlugin implements IMixinConfigPlugin {
     }
 
     @Override
+    // viewer not installed = mixin never applies
     public final boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
         return present;
     }

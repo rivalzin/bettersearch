@@ -1,0 +1,79 @@
+plugins {
+    id 'java'
+    /*
+     * RetroFuturaGradle: a CASA da 1.7.10 - o plugin existe para ela ("A Gradle plugin for
+     * development of Minecraft 1.7.10 modifications", palavra do README). A mesma 2.0.2 do
+     * modulo mc1_12_2, provada DUAS vezes nesta maquina pela sonda-1710: monta a 1.7.10
+     * (sonda A) e convive com o RFG da 1.12.2 no mesmo build (sonda B). O log da sonda
+     * mostrou ele escolhendo sozinho o Forge 1.7.10-10.13.4.1614 (o build final classico).
+     */
+    id 'com.gtnewhorizons.retrofuturagradle' version '2.0.2'
+}
+
+version = mod_version
+group = mod_group_id
+base.archivesName = "${mod_id}-forge-1.7.10"
+
+// 1.7.10 roda em Java 8. O proprio Gradle baixa o JDK (foojay no settings.gradle).
+java.toolchain.languageVersion = JavaLanguageVersion.of(8)
+
+minecraft {
+    mcVersion.set('1.7.10')
+    /*
+     * MCP stable_12: abaixo da 1.14.4 nao ha mapeamento da Mojang; e MCP ou nada. E a mais
+     * nova das CINCO versoes 1.7.10 do mcp_stable no maven da Forge (8..12, conferido no
+     * maven-metadata.xml em 18/ago/2026). Consequencia pratica: os nomes sao
+     * getMinecraft/GuiContainerCreative/searchField - todo alvo de gancho desta versao foi
+     * conferido na FONTE decompilada que a sonda-1710 exportou (mc1710-src1.zip), nunca
+     * traduzido de cabeca das versoes novas.
+     */
+    mcpMappingChannel.set('stable')
+    mcpMappingVersion.set('12')
+    username.set('rivalzin')
+}
+
+/*
+ * Mesmo arranjo das outras nove versoes: o core/ (o algoritmo, Java 8 puro) e o common/
+ * desta versao entram como pastas de fonte deste modulo. Nao ha subprojeto, nao ha shadow.
+ *
+ * SEM resources do common, de proposito - mesma licao da 1.12.2: os .lang e o icone moram
+ * na pasta DESTE modulo, cuja inclusao e provada pelo proprio mcmod.info que sempre carrega.
+ */
+sourceSets {
+    main {
+        java.srcDir rootProject.file('core/src/main/java')
+        java.srcDir file('../common/src/main/java')
+        /*
+         * Esbocos de compilacao do NEI 2.7.40-GTNH, lidos com javap do jar VERDADEIRO do
+         * pack (a secao 26 do verify reconfere cada membro). No srcDir do MAIN, e nao num
+         * sourceSet proprio como o jeiApi da 1.12.2, por uma diferenca crucial: os esbocos
+         * do NEI citam classes do Minecraft (ItemStack, EnumChatFormatting), e sourceSet
+         * avulso compila com classpath VAZIO - o RFG so entrega o jogo ao main. Foi
+         * exatamente o erro do compileNeoApiJava na 1.21.4, e a cura e a mesma de la:
+         * esboco no main + o jar EXCLUI e VARRE logo abaixo. Se um codechicken/... nosso
+         * entrasse no jar, ele substituiria a classe real do NEI no jogo.
+         */
+        java.srcDir file('src/neiApi/java')
+    }
+}
+
+tasks.named('jar') {
+    exclude 'codechicken/**'
+    // A trava da 1.21.4 (doLast que varre o zip): o exclude e a intencao, isto e a prova.
+    doLast {
+        def zip = new java.util.zip.ZipFile(archiveFile.get().asFile)
+        try {
+            def vazou = zip.entries().findAll { it.name.startsWith('codechicken/') }
+            if (!vazou.isEmpty()) {
+                throw new GradleException("esboco do NEI vazou para o jar: ${vazou*.name}")
+            }
+        } finally {
+            zip.close()
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    // Sem options.release: toolchain 8, o javac do 8 nao conhece a flag.
+}

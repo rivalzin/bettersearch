@@ -123,6 +123,11 @@ def modules = [
         // provou que ele convive com o Fabric Loom no mesmo build. So Forge: Fabric nao
         // existe para esta versao.
         'versions:mc1_12_2:forge',
+
+        // 1.7.10 - a casa do proprio RetroFuturaGradle. A sonda-1710 provou as duas coisas
+        // que faltavam: ele monta a 1.7.10 nesta maquina E convive com o RFG da 1.12.2 no
+        // MESMO build (duas versoes de Minecraft, um plugin). So Forge, como a 1.12.2.
+        'versions:mc1_7_10:forge',
 ]
 
 /*

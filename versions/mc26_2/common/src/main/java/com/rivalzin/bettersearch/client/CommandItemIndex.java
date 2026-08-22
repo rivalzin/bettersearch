@@ -14,19 +14,9 @@ import net.minecraft.world.item.Item;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Indice de <b>IDs de item</b>, pesquisavel pelo nome traduzido.
- *
- * <p>E o que permite escrever {@code /give @p bau} e receber {@code minecraft:chest} na
- * listinha de sugestoes. Diferente do indice do criativo, este cobre o registro inteiro
- * (nao so a aba de busca), porque um comando aceita qualquer item existente.
- *
- * <p>Montado sob demanda e fora da thread principal: quem nunca liga a opcao nunca paga
- * por ele.
- */
+// ids only, tooltips are useless in a command suggestion
 public final class CommandItemIndex {
-
-    private static final AsyncIndex<Identifier> INDEX = new AsyncIndex<>("IDs de item");
+    private static final AsyncIndex<Identifier> INDEX = new AsyncIndex<>("item ids");
 
     private CommandItemIndex() {
     }
@@ -35,21 +25,10 @@ public final class CommandItemIndex {
         INDEX.invalidate();
     }
 
-    /**
-     * @return os IDs que casam com o texto, ou {@code null} enquanto o indice nao existir
-     */
     public static List<Identifier> search(String rawQuery) {
         return search(rawQuery, BetterSearchClient.settings().searchCommandItems);
     }
 
-    /**
-     * O mesmo indice, sem amarrar na opcao de sugestao de comando.
-     *
-     * <p>O JEI usa isto para a busca entre idiomas: em vez de guardar o nome traduzido de cada um
-     * dos 30 mil ingredientes dele, pergunta aqui quais Identifiers casam e filtra a lista por isso. Este
-     * indice e pequeno (o registro de itens nao tem a explosao de NBT que incha a lista do JEI) e
-     * ja esta montado de qualquer jeito.
-     */
     public static List<Identifier> search(String rawQuery, boolean allowed) {
         SearchSettings settings = BetterSearchClient.settings();
         if (!BetterSearchClient.isEnabled() || !allowed) {
@@ -72,7 +51,7 @@ public final class CommandItemIndex {
             }
             return index.search(query, settings);
         } catch (Throwable t) {
-            BetterSearch.LOGGER.error("[{}] erro na busca de IDs de item", BetterSearch.MOD_NAME, t);
+            BetterSearch.LOGGER.error("[{}] item id search failed", BetterSearch.MOD_NAME, t);
             return null;
         }
     }
@@ -109,11 +88,11 @@ public final class CommandItemIndex {
                         SearchField.SOURCE_ID);
                 entries.add(builder.build());
             } catch (Throwable t) {
-                BetterSearch.LOGGER.debug("[{}] item ignorado no indice de comandos: {}",
+                BetterSearch.LOGGER.debug("[{}] skipped item in command index: {}",
                         BetterSearch.MOD_NAME, t.toString());
             }
         }
-        BetterSearch.LOGGER.info("[{}] indice de IDs de item pronto: {} itens",
+        BetterSearch.LOGGER.info("[{}] item id index ready: {} entries",
                 BetterSearch.MOD_NAME, entries.size());
         return new SearchIndex<>(entries);
     }

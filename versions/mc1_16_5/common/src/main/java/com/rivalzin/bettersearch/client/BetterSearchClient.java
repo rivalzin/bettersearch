@@ -15,18 +15,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-/**
- * Estado do mod no cliente: configuracao, tabela de idiomas e indice atual.
- *
- * <p>Regra de ouro: <b>nunca travar o jogo</b>. Se o indice ainda esta sendo montado, se a
- * configuracao desliga o mod ou se algo explode, todos os metodos publicos devolvem
- * {@code null} e o mixin simplesmente deixa a busca original do Minecraft agir.
- *
- * <p>Depende so de classes que existem em qualquer loader ({@code Minecraft}, {@code Util},
- * {@code ItemStack}); nada de NeoForge aqui.
- */
 public final class BetterSearchClient {
-
     private static SearchSettings settings = new SearchSettings();
     private static volatile LanguageTable languages = LanguageTable.EMPTY;
     private static Path configFile;
@@ -36,11 +25,13 @@ public final class BetterSearchClient {
     private static int indexedSize = -1;
     private static long indexedStamp = -1;
 
+    // bumped on every reload so every cache downstream knows to drop
     private static long languageStamp;
     private static boolean building;
     private static boolean resourcesReady;
-    /* Ja pedimos a leitura de emergencia? So uma vez por sessao - veja garantirPrimeiraLeitura. */
-    private static volatile boolean primeiraLeituraPedida;
+
+    private static volatile boolean firstLoadRequested;
+    // one throw and the mod stands down for the session instead of spamming
     private static boolean disabledByError;
 
     private static Object pendingSource;
@@ -52,83 +43,48 @@ public final class BetterSearchClient {
     private BetterSearchClient() {
     }
 
-    // ------------------------------------------------------------------ ciclo de vida
-
     public static SearchSettings settings() {
         return settings;
     }
 
-    /** Tabela de idiomas atual, compartilhada por todos os indices do mod. */
     public static LanguageTable languages() {
-        garantirPrimeiraLeitura();
+        ensureFirstLoad();
         return languages;
     }
 
-    /**
-     * Le os idiomas se a carga de recursos nunca nos chamou.
-     *
-     * <p><b>Por que isto e preciso justamente aqui.</b> No Forge da 1.16.5 nao existe o
-     * {@code RegisterClientReloadListenersEvent} (ele so nasceu na 1.19), entao o listener e
-     * registrado a mao durante o {@code FMLClientSetupEvent}. So que nessa versao o
-     * carregamento dos mods acontece <b>dentro</b> da primeira carga de recursos - e a lista
-     * de listeners daquela carga ja tinha sido tirada quando chegou a nossa vez. Resultado: o
-     * {@code apply} nunca era chamado na inicializacao.
-     *
-     * <p>O efeito em jogo era exatamente este: a busca por erro de digitacao funcionava (ela
-     * usa o nome no idioma atual), e a busca por outro idioma nao achava nada - ate o jogador
-     * apertar F3+T, que forca uma nova carga e dessa vez encontra o listener registrado.
-     * Confirmado no log: a linha "19 idiomas indexados (51827 traducoes)" so aparecia depois
-     * do F3+T, nunca na inicializacao.
-     *
-     * <p>Nao adianta so registrar mais cedo: durante o setup a carga de recursos ainda esta
-     * correndo, e ler arquivo dali de dentro e pior que o problema. Melhor esperar alguem
-     * precisar da tabela - a essa altura o jogo ja carregou tudo.
-     *
-     * <p>O {@code reloadLanguagesIfNeeded} nao cobria este caso porque ele desiste quando
-     * {@code resourcesReady} e falso, e era justamente esse o estado travado.
-     */
-    private static void garantirPrimeiraLeitura() {
-        if (resourcesReady || primeiraLeituraPedida || !settings.crossLanguage) {
+    private static void ensureFirstLoad() {
+        if (resourcesReady || firstLoadRequested || !settings.crossLanguage) {
             return;
         }
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null) {
             return;
         }
-        primeiraLeituraPedida = true;
+        firstLoadRequested = true;
         final ResourceManager resourceManager = minecraft.getResourceManager();
         final SearchSettings snapshot = settings.copy();
-        BetterSearch.LOGGER.info("[{}] a carga de recursos nao chamou o nosso listener; lendo os"
-                + " idiomas por conta propria", BetterSearch.MOD_NAME);
+        BetterSearch.LOGGER.info("[{}] resource reload never hit our listener, loading"
+                + " languages directly", BetterSearch.MOD_NAME);
         CompletableFuture
                 .supplyAsync(() -> LanguageTable.load(resourceManager, snapshot), Util.backgroundExecutor())
                 .whenComplete((table, error) -> minecraft.execute(() -> {
                     if (error != null) {
-                        BetterSearch.LOGGER.error("[{}] falha na primeira leitura dos idiomas",
+                        BetterSearch.LOGGER.error("[{}] first language load failed",
                                 BetterSearch.MOD_NAME, error);
-                        primeiraLeituraPedida = false;   // deixa tentar de novo
+                        firstLoadRequested = false;
                         return;
                     }
-                    /*
-                     * Se voltou vazia, NAO marcamos resourcesReady e liberamos nova tentativa.
-                     *
-                     * Marcar prontidao com tabela vazia era um beco sem saida: o
-                     * reloadLanguagesIfNeeded compara matchesRequest(settings), e a tabela vazia
-                     * carrega o request dentro dela - entao ele concluia "ja esta do jeito
-                     * pedido" e nunca mais relia. Ficava vazio para sempre, e nem trocar opcao
-                     * destravava.
-                     */
+
                     if (table == null || table.isEmpty()) {
                         BetterSearch.LOGGER.warn("[{}] a leitura por conta propria veio vazia -"
-                                + " vou tentar de novo na proxima busca", BetterSearch.MOD_NAME);
-                        primeiraLeituraPedida = false;
+                                + " will retry on next search", BetterSearch.MOD_NAME);
+                        firstLoadRequested = false;
                         return;
                     }
                     onLanguagesLoaded(table);
                 }));
     }
 
-    /** Muda sempre que os idiomas ou a configuracao mudam; invalida todos os indices. */
     public static long languageStamp() {
         return languageStamp;
     }
@@ -138,30 +94,15 @@ public final class BetterSearchClient {
         SearchSettings previous = settings;
         settings = newSettings;
 
-        // O cache do ultimo resultado sempre morre: qualquer opcao pode mudar o que sai.
         cachedQuery = null;
         cachedResults = null;
 
-        // O INDICE, nao. Remonta-lo leva de decimos de segundo a alguns segundos, e nesse
-        // meio tempo o mod devolve a busca original - era por isso que, logo depois de mexer
-        // numa opcao, parecia que nada tinha mudado. Agora so as quatro opcoes que alteram o
-        // conteudo do indice o descartam; o resto vale na hora.
         if (previous == null || newSettings.affectsIndex(previous)) {
             invalidate();
         }
         reloadLanguagesIfNeeded();
     }
 
-    /**
-     * O usuario ligou um idioma que ainda nao foi lido do disco? Entao relemos a tabela.
-     *
-     * <p>Trocar idiomas na tela de configuracao nao dispara um reload de recursos, que e
-     * quando a tabela normalmente e montada. Sem isto, ligar um idioma novo so teria efeito
-     * depois de um F3+T ou de reiniciar o jogo.
-     *
-     * <p>Desligar um idioma tem efeito na hora e nao depende disto: quem monta o indice ja
-     * confere {@code settings.indexesLanguage(...)} para cada idioma.
-     */
     private static void reloadLanguagesIfNeeded() {
         if (!resourcesReady || languages.matchesRequest(settings)) {
             return;
@@ -176,7 +117,7 @@ public final class BetterSearchClient {
                 .supplyAsync(() -> LanguageTable.load(resourceManager, snapshot), Util.backgroundExecutor())
                 .whenComplete((table, error) -> minecraft.execute(() -> {
                     if (error != null) {
-                        BetterSearch.LOGGER.error("[{}] falha ao recarregar os idiomas",
+                        BetterSearch.LOGGER.error("[{}] failed to reload languages",
                                 BetterSearch.MOD_NAME, error);
                         return;
                     }
@@ -184,14 +125,6 @@ public final class BetterSearchClient {
                 }));
     }
 
-    /** Onde a configuracao mora em disco. Definido pela camada de plataforma na inicializacao. */
-    /**
-     * Abre a tela de configuracao, se der.
-     *
-     * <p>Fica aqui, e nao em cada loader, porque a regra ("so quando nenhuma tela estiver
-     * aberta") tem de ser a mesma nos dois - senao o atalho se comporta diferente no Fabric
-     * e no NeoForge por puro descuido.
-     */
     public static void openConfigScreen() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft != null && minecraft.screen == null) {
@@ -203,10 +136,6 @@ public final class BetterSearchClient {
         configFile = file;
     }
 
-    /**
-     * Aplica o que o usuario escolheu na tela de configuracao e grava no disco.
-     * O indice e descartado, entao a proxima busca ja usa os valores novos.
-     */
     public static void applyAndSave(SearchSettings newSettings) {
         setSettings(newSettings.copy());
         if (configFile != null) {
@@ -214,7 +143,6 @@ public final class BetterSearchClient {
         }
     }
 
-    /** Chamado quando os recursos (e portanto os idiomas) sao recarregados. */
     public static void onLanguagesLoaded(LanguageTable table) {
         languages = table;
         resourcesReady = true;
@@ -227,8 +155,7 @@ public final class BetterSearchClient {
         indexedSource = null;
         indexedSize = -1;
         indexedStamp = -1;
-        // Importante: zerar tambem o "pendente", senao o proximo ensureIndex acharia que ja
-        // existe uma montagem em andamento para esta lista e nunca reconstruiria o indice.
+
         pendingSource = null;
         pendingSize = -1;
         cachedQuery = null;
@@ -236,15 +163,6 @@ public final class BetterSearchClient {
         RecipeSearch.invalidate();
         CommandItemIndex.invalidate();
 
-        // Os indices do JEI, do EMI e do REI NAO sao invalidados por chamada daqui, e isso e
-        // deliberado. Esta classe carrega sempre, com ou sem aqueles mods instalados; tocar
-        // naquelas classes obrigaria a JVM a resolve-las, e sem o mod correspondente no pack
-        // isso vira NoClassDefFoundError antes mesmo do jogo abrir.
-        //
-        // Em vez disso o contador abaixo sobe. Os tres guardam o indice com o carimbo junto e
-        // conferem sozinhos a cada busca, entao um carimbo novo ja significa "remonte". Quem
-        // nao esta instalado nao tem indice para remontar, e nenhuma classe daquele mod chega
-        // a ser mencionada.
         languageStamp++;
     }
 
@@ -252,21 +170,12 @@ public final class BetterSearchClient {
         return settings.enabled && !disabledByError;
     }
 
-    // ------------------------------------------------------------------ busca
-
-    /**
-     * Comeca a montar o indice, se necessario. Chamado quando a aba de busca abre, para que
-     * o indice ja esteja pronto quando a primeira letra for digitada.
-     */
     public static void prepare(Collection<ItemStack> displayItems) {
         if (isEnabled() && settings.searchCreative && displayItems != null) {
             ensureIndex(displayItems);
         }
     }
 
-    /**
-     * @return os itens que casam com a consulta, ou {@code null} para "use a busca original".
-     */
     public static List<ItemStack> search(String rawQuery, Collection<ItemStack> displayItems) {
         if (!isEnabled() || !settings.searchCreative || rawQuery == null || displayItems == null) {
             return null;
@@ -289,13 +198,11 @@ public final class BetterSearchClient {
             return results;
         } catch (Throwable t) {
             disabledByError = true;
-            BetterSearch.LOGGER.error("[{}] erro na busca; voltando para a busca original",
+            BetterSearch.LOGGER.error("[{}] search failed, falling back to vanilla",
                     BetterSearch.MOD_NAME, t);
             return null;
         }
     }
-
-    // ------------------------------------------------------------------ indice
 
     private static SearchIndex<ItemStack> ensureIndex(Collection<ItemStack> source) {
         SearchIndex<ItemStack> current = index;
@@ -316,21 +223,11 @@ public final class BetterSearchClient {
         Minecraft minecraft = Minecraft.getInstance();
         Player player = minecraft.player;
         if (player == null) {
-            return; // ainda nao ha mundo; tentamos de novo na proxima chamada
+            return;
         }
 
         final List<ItemStack> snapshot = java.util.Collections.unmodifiableList(new java.util.ArrayList<>(source));
-        /*
-         * languages(), e NAO o campo languages.
-         *
-         * Este era o furo: o metodo e que dispara a leitura de emergencia quando a carga de
-         * recursos nunca chamou o nosso listener (o caso do Forge 1.16.5). Lendo o campo
-         * direto, a busca do inventario montava o indice com a tabela VAZIA e nunca pedia a
-         * leitura - resultado: erro de digitacao funcionava (usa o idioma atual) e "machado"
-         * nao achava nada, exatamente como em jogo.
-         *
-         * O ReiSearch e o CommandItemIndex ja usavam o metodo; so este ponto lia o campo.
-         */
+
         final LanguageTable table = languages();
         final SearchSettings snapshotSettings = settings.copy();
         final long stamp = languageStamp;
@@ -345,7 +242,7 @@ public final class BetterSearchClient {
                 .whenComplete((built, error) -> minecraft.execute(() -> {
                     building = false;
                     if (error != null) {
-                        BetterSearch.LOGGER.error("[{}] falha ao montar o indice; usando a busca original",
+                        BetterSearch.LOGGER.error("[{}] index build failed, using vanilla search",
                                 BetterSearch.MOD_NAME, error);
                         disabledByError = true;
                         return;

@@ -15,16 +15,7 @@ import net.minecraft.world.item.TooltipFlag;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Transforma os itens da aba de busca do criativo em um {@link SearchIndex}.
- *
- * <p>Roda fora da thread principal (igual ao que o proprio jogo faz para montar as dicas da
- * arvore de busca vanilla). Todo o custo - normalizar texto, achar limites de palavra,
- * gerar tooltips - e pago uma vez aqui; digitar depois so faz comparacoes.
- */
 public final class CreativeIndexBuilder {
-
-    /** Quantas linhas de tooltip, no maximo, entram no indice por item. */
     private static final int MAX_TOOLTIP_LINES = 6;
 
     private CreativeIndexBuilder() {
@@ -44,17 +35,17 @@ public final class CreativeIndexBuilder {
             try {
                 entries.add(buildEntry(stack, languages, codes, settings, player, englishSearched));
             } catch (Throwable t) {
-                // Um item problematico de algum mod nao pode impedir a busca dos outros.
-                BetterSearch.LOGGER.debug("[{}] item ignorado no indice: {}", BetterSearch.MOD_NAME, t.toString());
+                BetterSearch.LOGGER.debug("[{}] skipped item: {}", BetterSearch.MOD_NAME, t.toString());
             }
         }
 
         SearchIndex<ItemStack> index = new SearchIndex<>(entries);
-        BetterSearch.LOGGER.info("[{}] indice pronto: {} itens em {} ms",
+        BetterSearch.LOGGER.info("[{}] index ready: {} items in {} ms",
                 BetterSearch.MOD_NAME, entries.size(), (System.nanoTime() - start) / 1_000_000);
         return index;
     }
 
+    // the whole cost of the mod is here, once per item
     private static SearchIndex.Entry<ItemStack> buildEntry(ItemStack stack,
                                                            LanguageTable languages,
                                                            List<String> codes,
@@ -66,13 +57,6 @@ public final class CreativeIndexBuilder {
         return builder.build();
     }
 
-    /**
-     * Os idiomas que estao ligados AGORA.
-     *
-     * <p>A tabela pode conter idiomas carregados antes de o usuario desmarca-los, e usa-la crua
-     * faria "pomme" continuar achando a maca (e a batata, que em frances e "pomme de terre")
-     * com o frances desligado.
-     */
     public static List<String> activeCodes(LanguageTable languages, SearchSettings settings) {
         List<String> codes = new ArrayList<>();
         for (String code : languages.languageCodes()) {
@@ -83,22 +67,10 @@ public final class CreativeIndexBuilder {
         return codes;
     }
 
-    /**
-     * Os apelidos secretos em ingles so entram se o ingles for mesmo pesquisado - seja porque o
-     * jogo esta em ingles, seja porque o idioma esta ligado na lista.
-     */
     public static boolean englishSearched(List<String> codes) {
         return codes.contains("en_us") || "en_us".equals(LanguageCatalog.currentCode());
     }
 
-    /**
-     * Despeja num {@link EntryBuilder} tudo por onde um ItemStack pode ser achado.
-     *
-     * <p>Publico e generico no valor de proposito: o indice do criativo guarda o proprio
-     * ItemStack, o do JEI guarda o elemento da lista dele e o do EMI guarda o ingrediente.
-     * Os tres precisam ser encontrados exatamente pelos mesmos textos, senao a busca do JEI
-     * nao seria a mesma busca do menu - que foi justamente o problema da 1.5.
-     */
     public static void fill(EntryBuilder<?> builder,
                             ItemStack stack,
                             LanguageTable languages,
@@ -106,15 +78,11 @@ public final class CreativeIndexBuilder {
                             SearchSettings settings,
                             Player player,
                             boolean englishSearched) {
-
         ResourceLocation id = BuiltInRegistries.ITEM.getKey(stack.getItem());
         builder.modId(id.getNamespace());
 
-        // 1) Nome no idioma do jogo (inclui nomes customizados de itens de mods).
         builder.add(stack.getHoverName().getString(), SearchField.SOURCE_NATIVE);
 
-        // 2) O mesmo nome nos outros idiomas. Textos repetidos sao descartados pelo builder,
-        //    entao "TNT" em 18 idiomas ocupa o espaco de um.
         if (settings.crossLanguage && !codes.isEmpty()) {
             String descriptionId = stack.getDescriptionId();
             for (String code : codes) {
@@ -127,39 +95,25 @@ public final class CreativeIndexBuilder {
             }
         }
 
-        // 3) Id do item: "minecraft diamond sword" (os separadores viram espaco na normalizacao).
         if (settings.searchItemIds) {
             builder.addNormalized(id.getNamespace() + ' ' + id.getPath().replace('_', ' '),
                     SearchField.SOURCE_ID);
         }
 
-        // 4) Linhas extras de tooltip - so para itens que carregam dados (livros encantados,
-        //    pocoes, flechas com efeito, discos...). Itens comuns nao ganham nada com isso
-        //    e gerar tooltip para todos seria caro.
         if (settings.searchTooltips && hasExtraData(stack)) {
-            // 1.20.1: a tooltip ainda nao recebe um contexto - so o jogador e a bandeira.
             List<Component> lines = stack.getTooltipLines(player, TooltipFlag.Default.NORMAL);
             int limit = Math.min(lines.size(), MAX_TOOLTIP_LINES + 1);
-            for (int i = 1; i < limit; i++) { // a linha 0 e o proprio nome, ja indexado
+            for (int i = 1; i < limit; i++) {
                 builder.add(lines.get(i).getString(), SearchField.SOURCE_TOOLTIP);
             }
         }
 
-        // 5) Apelidos secretos. SOURCE_NATIVE de proposito: sao palavras para digitar de
-        //    verdade, entao merecem a mesma tolerancia a erro do nome do item.
         for (String alias : EasterEggs.aliasesFor(id.toString(), englishSearched)) {
             builder.add(alias, SearchField.SOURCE_NATIVE);
         }
     }
 
-    /**
-     * O item carrega dados proprios? Se sim, a tooltip dele tem informacao de verdade
-     * (encantamento, efeito, autor...) e vale indexar.
-     *
-     * <p>Aqui mora a maior diferenca da 1.20.1: os <i>componentes</i> de item so chegaram na
-     * 1.20.5. Antes disso tudo era NBT, entao a pergunta "este item tem algo alem do padrao?"
-     * vira simplesmente "ele tem NBT?".
-     */
+    // enchanted or named stacks get their own entry, plain ones share
     private static boolean hasExtraData(ItemStack stack) {
         return stack.hasTag();
     }

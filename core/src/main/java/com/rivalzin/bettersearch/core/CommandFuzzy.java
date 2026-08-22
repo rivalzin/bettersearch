@@ -7,53 +7,19 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * Acha a opcao correta a partir da palavra errada que o jogador digitou num comando.
- *
- * <p>Comandos nao sao traduzidos: quem joga em portugues escreve {@code /gamemode criativo}
- * e leva um erro vermelho, porque a unica resposta certa e {@code creative}. Aqui a palavra
- * errada e comparada com as opcoes que o proprio jogo aceita naquele ponto do comando, e as
- * mais parecidas voltam como sugestao.
- *
- * <p><b>Duas camadas, com propositos opostos.</b>
- * <ol>
- *   <li><b>Parecidos</b> - todo candidato que passa da nota minima entra, sem limite de
- *       quantidade. Se dez opcoes se parecem com o que voce escreveu, aparecem as dez e voce
- *       rola a lista. E o mesmo criterio das outras buscas do mod: parecido aparece, diferente
- *       some.</li>
- *   <li><b>O mais proximo, custe o que custar</b> - se <i>nenhum</i> candidato passou da nota
- *       minima, ainda assim volta <b>um</b>: o de maior subsequencia comum. E o que faz
- *       {@code /gamemode sobrevivencia} oferecer {@code survival}, que nao chega perto de ser
- *       um erro de digitacao, mas e claramente mais parecido que {@code creative} ou
- *       {@code spectator}. Nunca deixar o jogador sem saida vale mais do que ficar calado.</li>
- * </ol>
- *
- * <p>Java puro, sem Minecraft: da para testar fora do jogo e vale igual em qualquer loader.
- */
 public final class CommandFuzzy {
-
-    /**
-     * Teto de seguranca, nao um limite de verdade.
-     *
-     * <p>Nao existe caso real em que cem opcoes se parecam com a mesma palavra; este numero
-     * so evita que uma lista absurda escape de um pacote de mods estranho.
-     */
     public static final int SAFETY_CAP = 100;
 
-    /** Nota minima para uma opcao ser "parecida"; abaixo disto ela so entra como ultimo recurso. */
     private static final int SCORE_FLOOR = 380;
 
     private static final int NO_MATCH = Integer.MIN_VALUE;
 
-    /** Palavras menores que isto sao ambiguas demais para corrigir. */
     private static final int MIN_WORD = 2;
 
     private CommandFuzzy() {
     }
 
-    /** Era um record; classe comum pelo mesmo motivo do MatchPolicy (o core/ compila em Java 8). */
     private static final class Scored {
-
         private final String text;
         private final int score;
 
@@ -71,12 +37,6 @@ public final class CommandFuzzy {
         }
     }
 
-    /**
-     * As opcoes mais parecidas com {@code word}, da melhor para a pior.
-     *
-     * <p>Nunca devolve lista vazia quando ha candidatos com letras: se nada for parecido,
-     * volta o mais proximo, sozinho.
-     */
     public static List<String> best(String word, Collection<String> candidates, int limit) {
         List<String> out = new ArrayList<>();
         if (word == null || candidates == null || candidates.isEmpty() || limit <= 0) {
@@ -84,7 +44,7 @@ public final class CommandFuzzy {
         }
         String query = letters(fold(word));
         if (query.length() < MIN_WORD || !hasLetter(query)) {
-            return out; // uma letra, ou so numeros: nao da para adivinhar nada
+            return out;
         }
 
         List<Scored> hits = new ArrayList<>();
@@ -99,7 +59,6 @@ public final class CommandFuzzy {
         }
 
         if (hits.isEmpty()) {
-            // Camada 2: ninguem e parecido, entao vale o menos diferente.
             String closest = closest(query, candidates);
             if (closest != null) {
                 out.add(closest);
@@ -107,9 +66,6 @@ public final class CommandFuzzy {
             return out;
         }
 
-        // Nota primeiro; empatando, a opcao mais curta (quase sempre a que a pessoa queria);
-        // empatando de novo, ordem alfabetica - so para a lista nao mudar sozinha entre
-        // duas teclas.
         hits.sort(Comparator.comparingInt(Scored::score).reversed()
                 .thenComparingInt(hit -> hit.text().length())
                 .thenComparing(Scored::text));
@@ -123,16 +79,6 @@ public final class CommandFuzzy {
         return best(word, candidates, SAFETY_CAP);
     }
 
-    // ------------------------------------------------------------------ o menos diferente
-
-    /**
-     * O candidato de maior subsequencia comum com a palavra digitada.
-     *
-     * <p>Subsequencia, e nao distancia de edicao: para textos de tamanhos bem diferentes a
-     * distancia vira quase so a diferenca de comprimento e perde a noticia. Em
-     * "sobrevivencia" x "survival" a subsequencia comum e {@code s r v i v a} - seis letras
-     * na ordem certa, mais do que qualquer outro modo de jogo consegue.
-     */
     private static String closest(String query, Collection<String> candidates) {
         String best = null;
         double bestScore = -1.0;
@@ -143,7 +89,7 @@ public final class CommandFuzzy {
             }
             String target = letters(fold(candidate));
             if (target.isEmpty() || (mask(target) & queryMask) == 0L) {
-                continue; // sem uma unica letra em comum nao ha o que comparar
+                continue;
             }
             double score = similarity(query, target);
             int cut = Math.max(candidate.lastIndexOf(':'), candidate.lastIndexOf('/'));
@@ -169,7 +115,6 @@ public final class CommandFuzzy {
         return candidate.compareTo(current) < 0;
     }
 
-    /** Razao da maior subsequencia comum: 0 = nada em comum, 1 = identicos. */
     static double similarity(String a, String b) {
         int longest = Math.max(a.length(), b.length());
         return longest == 0 ? 0.0 : commonSubsequence(a, b) / (double) longest;
@@ -195,7 +140,6 @@ public final class CommandFuzzy {
         return previous[lb];
     }
 
-    /** Assinatura de 64 bits das letras presentes, usada so como pre-filtro barato. */
     private static long mask(String text) {
         long mask = 0L;
         for (int i = 0; i < text.length(); i++) {
@@ -204,17 +148,9 @@ public final class CommandFuzzy {
         return mask;
     }
 
-    // ------------------------------------------------------------------ pontuacao
-
-    /**
-     * Nota de uma opcao. O mesmo candidato e olhado de tres jeitos e vale o melhor deles:
-     * inteiro ({@code minecraft:zombie}), so o fim ({@code zombie}) e so as iniciais
-     * ({@code doDaylightCycle} -> {@code ddc}).
-     */
     static int score(String query, String candidate) {
         int best = compare(query, letters(fold(candidate)));
 
-        // O namespace nao pode atrapalhar: "zumbi" tem de achar "minecraft:zombie".
         int cut = Math.max(candidate.lastIndexOf(':'), candidate.lastIndexOf('/'));
         String tail = cut >= 0 && cut + 1 < candidate.length() ? candidate.substring(cut + 1) : null;
         if (tail != null) {
@@ -241,7 +177,6 @@ public final class CommandFuzzy {
         return initials.startsWith(query) ? 640 : NO_MATCH;
     }
 
-    /** Desconto que nunca "da a volta" no inteiro quando a nota e {@link #NO_MATCH}. */
     private static int demote(int score, int penalty) {
         return score == NO_MATCH ? NO_MATCH : score - penalty;
     }
@@ -256,16 +191,14 @@ public final class CommandFuzzy {
         if (target.startsWith(query)) {
             return 900 - Math.min(80, target.length() - query.length());
         }
-        // "conter" so vale com palavra de verdade dos dois lados. Sem isto, "w" caberia
-        // dentro de "wheater" e o comando /w ganharia de /weather - foi o que aconteceu.
+
         if (query.length() >= 3 && target.length() >= 3 && target.contains(query)) {
             return 760 - Math.min(60, target.length() - query.length());
         }
         if (target.length() >= 4 && target.length() * 2 >= query.length() && query.contains(target)) {
-            // Digitou uma opcao valida e sobrou texto. Cada sobra pesa como um erro, senao
-            // "tellrow" ficaria mais perto de "tell" do que de "tellraw".
             return 640 - Math.min(160, (query.length() - target.length()) * 40);
         }
+        // suggestion lists are short, so a wrong guess is worse than none
         int max = maxEdits(query.length(), target.length());
         int distance = distance(query, target, max);
         if (distance >= 0) {
@@ -277,25 +210,13 @@ public final class CommandFuzzy {
         return NO_MATCH;
     }
 
-    /**
-     * Quantos erros de digitacao sao aceitos entre duas palavras.
-     *
-     * <p>Bem mais generoso que a busca de itens - metade da palavra - porque aqui o
-     * candidato vem de uma lista fechada (as opcoes daquele comando) e nao do jogo inteiro,
-     * e porque o corte por distancia ate o primeiro colocado limpa o resto depois.
-     */
     static int maxEdits(int queryLength, int targetLength) {
         int n = Math.max(queryLength, targetLength);
         int allowed = n <= 3 ? 1 : n <= 4 ? 2 : n <= 7 ? 3 : n <= 10 ? 4 : 5;
         return Math.max(1, Math.min(allowed, n / 2));
     }
 
-    /**
-     * Distancia de Damerau-Levenshtein, ou -1 se passar de {@code max}.
-     *
-     * <p>Damerau, e nao Levenshtein simples, porque trocar duas letras de lugar
-     * ({@code craetive}) e o erro de digitacao mais comum que existe e deve custar 1, nao 2.
-     */
+    // two rolling rows, no full matrix - this runs per suggestion per keystroke
     static int distance(String a, String b, int max) {
         int la = a.length();
         int lb = b.length();
@@ -330,7 +251,7 @@ public final class CommandFuzzy {
                 rowBest = Math.min(rowBest, value);
             }
             if (rowBest > max) {
-                return -1; // nenhuma continuacao desta linha cabe no limite
+                return -1;
             }
             int[] recycled = beforePrevious;
             beforePrevious = previous;
@@ -351,7 +272,6 @@ public final class CommandFuzzy {
         return at == query.length();
     }
 
-    /** Primeira letra de cada pedaco, quebrando em separadores e em maiuscula no meio. */
     static String initials(String raw) {
         StringBuilder out = new StringBuilder();
         boolean starting = true;
@@ -373,9 +293,6 @@ public final class CommandFuzzy {
         return out.toString();
     }
 
-    // ------------------------------------------------------------------ texto
-
-    /** Minusculas e sem acento, mas <b>mantendo</b> os separadores ({@code : _ . -}). */
     static String fold(String input) {
         String decomposed = Normalizer.normalize(input.toLowerCase(Locale.ROOT), Normalizer.Form.NFKD);
         StringBuilder out = new StringBuilder(decomposed.length());
@@ -388,7 +305,6 @@ public final class CommandFuzzy {
         return out.toString();
     }
 
-    /** So letras e digitos: {@code minecraft:zombie} vira {@code minecraftzombie}. */
     static String letters(String folded) {
         StringBuilder out = new StringBuilder(folded.length());
         for (int i = 0; i < folded.length(); i++) {
@@ -409,14 +325,10 @@ public final class CommandFuzzy {
         return false;
     }
 
-    // ------------------------------------------------------------------ recorte da palavra
-
-    /** Um caractere faz parte da palavra que esta sendo corrigida? */
     public static boolean isWordChar(char c) {
         return Character.isLetterOrDigit(c) || c == '_' || c == '-' || c == '.' || c == ':';
     }
 
-    /** Inicio da palavra que contem (ou termina em) {@code at}. */
     public static int wordStart(String text, int at) {
         int index = Math.max(0, Math.min(at, text.length()));
         while (index > 0 && isWordChar(text.charAt(index - 1))) {
@@ -425,7 +337,6 @@ public final class CommandFuzzy {
         return index;
     }
 
-    /** Fim da palavra que comeca em {@code at}. */
     public static int wordEnd(String text, int at) {
         int index = Math.max(0, Math.min(at, text.length()));
         while (index < text.length() && isWordChar(text.charAt(index))) {

@@ -10,24 +10,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Liga e desliga, um a um, todos os idiomas que o jogo conhece.
- *
- * <p>A lista vem do proprio Minecraft, entao inclui idiomas trazidos por resource packs e
- * nunca fica desatualizada. Com mais de cem entradas, ha uma barra de busca no painel da
- * direita: ela filtra por nome ou por codigo e usa a mesma normalizacao do mod, entao
- * digitar "portugues" encontra "Português".
- *
- * <p>O idioma em uso no jogo funciona sempre, ligado ou nao: o nome que aparece na tela ja
- * e indexado direto do item.
- *
- * <p>A caixa de busca desta era e o {@code GuiTextField}, que nao e botao: ela nao entra na
- * buttonList, e tecla, clique, tique e desenho passam por ela na mao - o padrao vanilla
- * (GuiCreateWorld faz igual). O "responder" das outras versoes vira comparar o texto depois
- * de cada tecla.
- */
+// the list is what the resource packs actually ship, not a hardcoded table
 public final class LanguageSelectScreen extends OptionRowsScreen {
-
     private final SearchSettings settings;
     private final List<LanguageCatalog.Entry> languages;
     private final String currentCode;
@@ -80,12 +64,10 @@ public final class LanguageSelectScreen extends OptionRowsScreen {
         int width = panelWidth() - 12;
         int y = panelFooterTop() + 4;
 
-        // A mesma caixa e reaproveitada entre reconstrucoes, para nao perder o que foi
-        // digitado nem o cursor quando a lista e refiltrada a cada tecla.
         if (searchBox == null) {
             searchBox = new GuiTextField(0, this.fontRenderer, x, y, width, BUTTON_HEIGHT);
             searchBox.setMaxStringLength(32);
-            searchBox.setFocused(true); // o setInitialFocus das outras versoes
+            searchBox.setFocused(true);
         } else {
             searchBox.x = x;
             searchBox.y = y;
@@ -112,18 +94,14 @@ public final class LanguageSelectScreen extends OptionRowsScreen {
                 .bounds(x, y + 2 * BUTTON_GAP, width, BUTTON_HEIGHT).build());
     }
 
-    // ------------------------------------------------------------------ a caixa de busca
-
     @Override
     protected void keyTyped(char typedChar, int keyCode) throws IOException {
         if (searchBox != null && searchBox.textboxKeyTyped(typedChar, keyCode)) {
-            // O "responder" desta era: a caixa consumiu a tecla, compara o texto de agora.
             String normalized = TextNormalizer.normalize(searchBox.getText());
             if (!normalized.equals(filter)) {
                 filter = normalized;
                 resetScroll();
-                // Ja adiado para o comeco do proximo quadro pela base - e o needsRebuild
-                // que as outras versoes faziam na mao, pelo mesmo motivo.
+
                 rebuildWidgets();
             }
             return;
@@ -134,7 +112,6 @@ public final class LanguageSelectScreen extends OptionRowsScreen {
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
         if (searchBox != null) {
-            // Antes da base, como o vanilla faz: a caixa tambem PERDE o foco em clique fora.
             searchBox.mouseClicked(mouseX, mouseY, mouseButton);
         }
         super.mouseClicked(mouseX, mouseY, mouseButton);
@@ -144,7 +121,7 @@ public final class LanguageSelectScreen extends OptionRowsScreen {
     public void updateScreen() {
         super.updateScreen();
         if (searchBox != null) {
-            searchBox.updateCursorCounter(); // o piscar do cursor
+            searchBox.updateCursorCounter();
         }
     }
 
@@ -154,8 +131,7 @@ public final class LanguageSelectScreen extends OptionRowsScreen {
             return;
         }
         searchBox.drawTextBox();
-        // O texto-fantasma (setSuggestion das outras versoes): o GuiTextField desta era nao
-        // tem; o convite e desenhado em cinza por cima quando o campo esta vazio.
+
         if (searchBox.getText().isEmpty()) {
             this.fontRenderer.drawString(
                     ComponentCompat.translatable("bettersearch.config.languages.search"),
@@ -177,8 +153,6 @@ public final class LanguageSelectScreen extends OptionRowsScreen {
                 enabledCount(), languages.size(), currentCode);
     }
 
-    // ------------------------------------------------------------------ estado
-
     private boolean isEnabled(String code) {
         return settings.indexesAllLanguages() || settings.languages.contains(code);
     }
@@ -194,7 +168,6 @@ public final class LanguageSelectScreen extends OptionRowsScreen {
     }
 
     private void setEnabled(String code, boolean enabled) {
-        // Troca o coringa "*" pela lista explicita, senao desligar um idioma nao teria efeito.
         if (settings.indexesAllLanguages()) {
             settings.languages = allCodes();
         }

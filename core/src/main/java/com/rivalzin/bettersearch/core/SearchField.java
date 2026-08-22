@@ -1,39 +1,29 @@
 package com.rivalzin.bettersearch.core;
 
-/**
- * Um texto pesquisavel ja normalizado e pre-processado.
- *
- * <p>Cada item do inventario criativo vira varios {@code SearchField}: o nome no idioma do jogo,
- * o nome em ingles, o nome em cada idioma extra, o id, as linhas de tooltip...
- * Todo o trabalho caro (normalizar, achar limites de palavra, calcular mascara) e feito uma
- * unica vez, na construcao do indice; a digitacao so faz comparacoes baratas.
- */
+// id, tooltip and the language fields each score separately
 public final class SearchField {
-
-    /** Nome no idioma atual do jogo. */
     public static final byte SOURCE_NATIVE = 0;
-    /** Nome em ingles (en_us). */
+
     public static final byte SOURCE_ENGLISH = 1;
-    /** Nome em qualquer outro idioma. */
+
     public static final byte SOURCE_FOREIGN = 2;
-    /** Id do item / do mod. */
+
     public static final byte SOURCE_ID = 3;
-    /** Linha de tooltip (encantamento, efeito de pocao...). */
+
     public static final byte SOURCE_TOOLTIP = 4;
 
-    /** Texto normalizado (minusculo, sem acentos, separadores colapsados em espaco). */
     public final String text;
-    /** Assinatura de caracteres, usada como pre-filtro da busca aproximada. */
+
     public final long mask;
-    /** Indice inicial de cada palavra dentro de {@link #text}. */
+
     public final int[] wordStarts;
-    /** Iniciais das palavras ("diamond sword" -> "ds"); {@code null} se houver menos de 2 palavras. */
+
     public final String initials;
-    /** {@link #text} sem espacos ("netheritesword"); {@code null} se so houver uma palavra. */
+
     public final String compact;
-    /** Assinatura de {@link #compact}. */
+
     public final long compactMask;
-    /** De onde este texto veio (uma das constantes {@code SOURCE_*}). */
+
     public final byte source;
 
     public SearchField(String normalizedText, byte source) {
@@ -81,7 +71,6 @@ public final class SearchField {
         }
     }
 
-    /** Fim (exclusivo) da palavra {@code index}. */
     public int wordEnd(int index) {
         return wordEnd(text, wordStarts, index);
     }

@@ -8,24 +8,10 @@ import net.minecraft.client.Minecraft;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
-/**
- * Um indice montado fora da thread principal, com deteccao de "esta velho?".
- *
- * <p>Regra: enquanto o indice nao estiver pronto, {@link #get} devolve {@code null} e quem
- * chamou usa a busca original do jogo. Nunca se espera o indice ficar pronto - o jogo nao
- * pode travar por causa de uma barra de busca.
- *
- * <p>A identidade da fonte ({@code source}) e comparada por referencia e o tamanho por valor:
- * quando o Minecraft reconstroi a lista (novo mundo, permissao de operador, recarga de
- * receitas), o objeto muda e o indice e refeito sozinho.
- */
+// built off-thread, swapped in whole - readers never see a half index
 public final class AsyncIndex<T> {
-
     private final String name;
 
-    // Tudo volatile porque este objeto e lido de mais de uma thread: o criativo e o JEI
-    // perguntam da thread do jogo, mas o EMI e o REI perguntam das threads de busca deles.
-    // Sem isto, a thread do REI poderia nunca enxergar que a montagem terminou.
     private volatile SearchIndex<T> index;
     private volatile Object readySource;
     private volatile int readySize = -1;
@@ -42,25 +28,10 @@ public final class AsyncIndex<T> {
         this.name = name;
     }
 
-    /**
-     * @param source objeto que identifica a lista de origem (comparado por referencia)
-     * @param size   tamanho atual da lista de origem
-     * @param stamp  contador que muda quando os idiomas ou a configuracao mudam
-     * @param build  monta o indice; roda FORA da thread principal, entao precisa receber
-     *               tudo o que precisa ja capturado
-     * @return o indice pronto, ou {@code null} enquanto ele nao existir
-     */
     public SearchIndex<T> get(Object source, int size, long stamp, Supplier<SearchIndex<T>> build) {
         return get(source, size, stamp, build, null);
     }
 
-    /**
-     * O indice pronto, ou {@code null} - sem disparar montagem nenhuma.
-     *
-     * <p>Existe para quem precisa preparar algo caro antes de pedir a montagem (copiar uma lista
-     * de dezenas de milhares de elementos, por exemplo). Perguntando aqui primeiro, esse preparo
-     * so acontece nas poucas vezes em que o indice realmente falta.
-     */
     public SearchIndex<T> ready(Object source, int size, long stamp) {
         SearchIndex<T> current = index;
         if (current != null && readySource == source && readySize == size && readyStamp == stamp) {
@@ -69,12 +40,6 @@ public final class AsyncIndex<T> {
         return null;
     }
 
-    /**
-     * @param onReady chamado na thread principal assim que o indice fica pronto. Serve para quem
-     *                guarda o resultado em cache proprio e nunca mais perguntaria - o caso do JEI,
-     *                que so refaz a lista quando o texto muda. Sem este empurrao, um indice que
-     *                ficou pronto meio segundo depois da primeira tecla so seria usado na proxima.
-     */
     public SearchIndex<T> get(Object source, int size, long stamp, Supplier<SearchIndex<T>> build,
                               Runnable onReady) {
         SearchIndex<T> current = index;
@@ -92,7 +57,6 @@ public final class AsyncIndex<T> {
 
     private synchronized void start(Object source, int size, long stamp, Supplier<SearchIndex<T>> build,
                                     Runnable onReady) {
-        // Conferir de novo dentro da trava: duas threads podem ter passado pelo teste la fora.
         if (building || (pendingSource == source && pendingSize == size && pendingStamp == stamp)) {
             return;
         }
@@ -110,7 +74,7 @@ public final class AsyncIndex<T> {
                 .whenComplete((built, error) -> minecraft.execute(() -> {
                     building = false;
                     if (error != null) {
-                        BetterSearch.LOGGER.error("[{}] falha ao montar o indice de {}",
+                        BetterSearch.LOGGER.error("[{}] failed to build {} index",
                                 BetterSearch.MOD_NAME, name, error);
                         failed = true;
                         return;
@@ -125,13 +89,13 @@ public final class AsyncIndex<T> {
                 }));
     }
 
+    // drops the index, the next search rebuilds it
     public void invalidate() {
         index = null;
         readySource = null;
         readySize = -1;
         readyStamp = Long.MIN_VALUE;
-        // Zerar o "pendente" tambem, senao a proxima chamada acharia que ja existe uma
-        // montagem em andamento para esta mesma fonte e nunca reconstruiria.
+
         pendingSource = null;
         pendingSize = -1;
         pendingStamp = Long.MIN_VALUE;

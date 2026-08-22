@@ -11,24 +11,7 @@ import net.neoforged.neoforge.client.settings.KeyConflictContext;
 import net.neoforged.neoforge.client.settings.KeyModifier;
 import org.lwjgl.glfw.GLFW;
 
-/**
- * Atalho de teclado para abrir a configuracao: <b>Alt + O</b>.
- *
- * <p>A tela de configuracao e inteiramente deste mod - o botao na lista de mods e apenas
- * uma porta de entrada. Por isso da para abri-la direto por uma tecla, sem depender de
- * nenhum outro mod nem de passar pela lista.
- *
- * <p>Registrado como {@code KeyMapping}, entao aparece sozinho em <b>Opcoes &gt; Controles</b>,
- * na categoria do mod, e pode ser remapeado por la. O contexto {@code IN_GAME} evita que a
- * tecla dispare enquanto voce digita no chat ou esta em outra tela.
- */
 public final class BetterSearchKeys {
-
-    /*
-     * 1.21.9: a categoria da tecla deixou de ser uma string de traducao solta e virou um
-     * objeto com id proprio. O texto que aparece na tela sai de "key.category." + o id, ou
-     * seja: key.category.bettersearch.main, que esta nos arquivos de idioma do mod.
-     */
     public static final KeyMapping.Category CATEGORY = new KeyMapping.Category(
             Identifier.fromNamespaceAndPath(BetterSearch.MOD_ID, "main"));
 
@@ -44,15 +27,11 @@ public final class BetterSearchKeys {
     }
 
     static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
-        // A categoria vem antes da tecla: sem registra-la, a tela de Controles nao tem onde
-        // encaixar o atalho.
         event.registerCategory(CATEGORY);
         event.register(OPEN_CONFIG);
     }
 
     static void onClientTick(ClientTickEvent.Post event) {
-        // consumeClick devolve true uma vez por pressionada, entao segurar a tecla nao
-        // reabre a tela repetidamente.
         while (OPEN_CONFIG.consumeClick()) {
             BetterSearchClient.openConfigScreen();
         }

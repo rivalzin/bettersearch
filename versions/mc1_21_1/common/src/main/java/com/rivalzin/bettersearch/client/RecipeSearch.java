@@ -17,21 +17,9 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Busca do livro de receitas.
- *
- * <p>Cada grupo de receitas e indexado pelo nome do item que ele produz, nos mesmos idiomas
- * configurados para o inventario criativo. Assim procurar "bau" (ou "coffre", ou "chest",
- * ou "bua") no livro de receitas acha a receita do bau.
- *
- * <p>O indice e montado assim que a tela do inventario abre - e nao na primeira letra
- * digitada. A razao e simples: a busca do livro so e reexecutada quando o texto muda, entao
- * um indice que ficasse pronto <i>depois</i> da ultima tecla nunca seria usado, e a busca
- * pareceria nao funcionar.
- */
+// the recipe book searches collections, not single items
 public final class RecipeSearch {
-
-    private static final AsyncIndex<RecipeCollection> INDEX = new AsyncIndex<>("receitas");
+    private static final AsyncIndex<RecipeCollection> INDEX = new AsyncIndex<>("recipes");
     private static boolean loggedActive;
 
     private RecipeSearch() {
@@ -42,14 +30,10 @@ public final class RecipeSearch {
         loggedActive = false;
     }
 
-    /** Comeca a montar o indice, se ainda nao existir. Barato quando ja esta pronto. */
     public static void prepare() {
         ensureIndex();
     }
 
-    /**
-     * @return os grupos de receitas que casam, ou {@code null} para "use a busca original"
-     */
     public static List<RecipeCollection> search(String rawQuery) {
         SearchIndex<RecipeCollection> index = ensureIndex();
         if (index == null || index.size() == 0) {
@@ -63,12 +47,12 @@ public final class RecipeSearch {
             }
             if (!loggedActive) {
                 loggedActive = true;
-                BetterSearch.LOGGER.info("[{}] busca do livro de receitas ativa ({} grupos indexados)",
+                BetterSearch.LOGGER.info("[{}] recipe book search ready ({} groups indexed)",
                         BetterSearch.MOD_NAME, index.size());
             }
             return index.search(query, settings);
         } catch (Throwable t) {
-            BetterSearch.LOGGER.error("[{}] erro na busca de receitas", BetterSearch.MOD_NAME, t);
+            BetterSearch.LOGGER.error("[{}] recipe search failed", BetterSearch.MOD_NAME, t);
             return null;
         }
     }
@@ -86,7 +70,7 @@ public final class RecipeSearch {
         ClientRecipeBook book = minecraft.player.getRecipeBook();
         List<RecipeCollection> collections = book.getCollections();
         if (collections.isEmpty()) {
-            return null; // o servidor ainda nao mandou as receitas
+            return null;
         }
 
         final List<RecipeCollection> snapshot = List.copyOf(collections);
@@ -113,8 +97,6 @@ public final class RecipeSearch {
             try {
                 EntryBuilder<RecipeCollection> builder = new EntryBuilder<>(collection);
                 for (RecipeHolder<?> holder : collection.getRecipes()) {
-                    // Cada grupo carrega o proprio RegistryAccess: e mais correto (e mais
-                    // seguro fora da thread principal) do que pegar o do mundo.
                     ItemStack result = holder.value().getResultItem(collection.registryAccess());
                     if (result.isEmpty()) {
                         continue;
@@ -147,11 +129,11 @@ public final class RecipeSearch {
                 }
             } catch (Throwable t) {
                 skipped++;
-                BetterSearch.LOGGER.debug("[{}] grupo de receitas ignorado: {}",
+                BetterSearch.LOGGER.debug("[{}] skipped recipe group: {}",
                         BetterSearch.MOD_NAME, t.toString());
             }
         }
-        BetterSearch.LOGGER.info("[{}] indice de receitas pronto: {} grupos ({} sem resultado utilizavel)",
+        BetterSearch.LOGGER.info("[{}] recipe index ready: {} grupos ({} sem result utilizavel)",
                 BetterSearch.MOD_NAME, entries.size(), skipped);
         return new SearchIndex<>(entries);
     }

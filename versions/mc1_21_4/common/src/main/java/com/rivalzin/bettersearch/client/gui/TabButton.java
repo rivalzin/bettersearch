@@ -9,14 +9,8 @@ import net.minecraft.network.chat.Component;
 
 import java.util.function.BooleanSupplier;
 
-/**
- * Aba do topo da tela de configuracao.
- *
- * <p>A aba selecionada fica mais clara e ganha um risco na cor de destaque do mod embaixo -
- * o mesmo ciano da lupa do icone.
- */
+// active tab is drawn last so its border wins the overlap
 public final class TabButton extends AbstractWidget {
-
     public static final int HEIGHT = 20;
 
     private final BooleanSupplier selected;
@@ -49,8 +43,6 @@ public final class TabButton extends AbstractWidget {
             guiGraphics.fill(x + 1, bottom - 2, right - 1, bottom - 1, Theme.ACCENT);
         }
 
-        // Com quatro abas em uma tela estreita o nome pode nao caber; cortamos em vez de
-        // deixar o texto vazar por cima da aba vizinha.
         Minecraft minecraft = Minecraft.getInstance();
         String label = getMessage().getString();
         int limit = getWidth() - 6;

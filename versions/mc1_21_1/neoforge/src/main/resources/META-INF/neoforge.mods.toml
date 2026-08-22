@@ -36,18 +36,24 @@ config = "bettersearch-rei.mixins.json"
 [[dependencies.bettersearch]]
 modId = "neoforge"
 type = "required"
-# So a linha 21.1 (= Minecraft 1.21.1). Um limite superior AQUI nao e frescura: sem ele o
-# NeoForge deixa o mod carregar em 1.21.4, 26.1, no que vier - e ai os mixins nao acham os
-# alvos e o jogo quebra na cara do jogador. Cada versao portada ganha o proprio jar.
-versionRange = "[21.1.0,21.2)"
+# As linhas 21.0 e 21.1 (= Minecraft 1.21 e 1.21.1), do mesmo jeito que a 1.21.9 cobre
+# 1.21.9 e 1.21.10 com um jar so. O piso e 21.0.143 - a primeira 21.0.x ESTAVEL (as
+# anteriores sao "-beta", codigo em movimento). Um limite superior AQUI nao e frescura: sem
+# ele o NeoForge deixa o mod carregar em 1.21.4, 26.1, no que vier - e ai os mixins nao
+# acham os alvos e o jogo quebra na cara do jogador.
+versionRange = "[21.0.143,21.2)"
 ordering = "NONE"
 side = "CLIENT"
 
 [[dependencies.bettersearch]]
 modId = "minecraft"
 type = "required"
-# Verificado no 1.21.1 e so nele. O 1.21 (.0) quase certamente serve tambem, mas "quase
-# certamente" nao entra em arquivo de compatibilidade sem uma build de confirmacao.
-versionRange = "[1.21.1,1.21.2)"
+# 1.21 e 1.21.1. O "quase certamente" que morava neste comentario virou prova em
+# 19/ago/2026 (ferramentas/sonda-121): o codigo de producao INTEIRO compilou contra o
+# Minecraft 1.21 com NeoForge 21.0.167, e os alvos dos tres mixins vanilla foram conferidos
+# um a um no bytecode de la - inclusive o SearchTree.search(String)List do livro de
+# receitas, com descritor identico (na 1.18.2 esse mesmo ponto era MutableSearchTree e
+# derrubava o jogo). Nao ha modulo mc1_21_0: e o MESMO jar, com a faixa alargada.
+versionRange = "[1.21,1.21.2)"
 ordering = "NONE"
 side = "CLIENT"

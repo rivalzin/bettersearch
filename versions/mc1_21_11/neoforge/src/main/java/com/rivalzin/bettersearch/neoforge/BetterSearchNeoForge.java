@@ -18,23 +18,8 @@ import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 
 import java.nio.file.Path;
 
-/**
- * Ponto de entrada do NeoForge - de proposito, o arquivo mais curto do mod.
- *
- * <p>Ele faz exatamente quatro coisas:
- * <ol>
- *   <li>descobre onde fica a pasta de configuracao;</li>
- *   <li>carrega a configuracao;</li>
- *   <li>registra o listener que le os arquivos de idioma;</li>
- *   <li>liga a tela de configuracao ao botao da lista de mods.</li>
- * </ol>
- *
- * <p>Todo o resto do mod nao conhece NeoForge. Portar para Fabric e reescrever este arquivo
- * (veja PORTING.md).
- */
 @Mod(value = BetterSearch.MOD_ID, dist = Dist.CLIENT)
 public final class BetterSearchNeoForge {
-
     public BetterSearchNeoForge(IEventBus modEventBus, ModContainer modContainer) {
         Path configFile = FMLPaths.CONFIGDIR.get().resolve(BetterSearch.MOD_ID + ".json");
         SearchSettings settings = ConfigIo.loadOrCreate(configFile);
@@ -44,20 +29,13 @@ public final class BetterSearchNeoForge {
         modEventBus.addListener(BetterSearchNeoForge::onRegisterClientReloadListeners);
         modEventBus.addListener(BetterSearchKeys::onRegisterKeyMappings);
 
-        // Duas portas de entrada para a mesma tela: o botao "Config" ao lado do mod na
-        // lista de mods, e o atalho Alt+O, que nao depende de nada.
         modContainer.registerExtensionPoint(IConfigScreenFactory.class,
                 (container, modListScreen) -> new BetterSearchConfigScreen(modListScreen));
         NeoForge.EVENT_BUS.addListener(BetterSearchKeys::onClientTick);
 
-        BetterSearch.LOGGER.info("[{}] carregado. Configuracao: {}", BetterSearch.MOD_NAME, configFile);
+        BetterSearch.LOGGER.info("[{}] loaded, config: {}", BetterSearch.MOD_NAME, configFile);
     }
 
-    /*
-     * 1.21.9: o RegisterClientReloadListenersEvent virou AddClientReloadListenersEvent, e
-     * agora cada listener precisa de um nome proprio. Nao e burocracia: e o nome que permite
-     * dizer "o meu roda depois do idioma do jogo", e o NeoForge passou a exigir de todo mod.
-     */
     private static void onRegisterClientReloadListeners(AddClientReloadListenersEvent event) {
         event.addListener(Identifier.fromNamespaceAndPath(BetterSearch.MOD_ID, "languages"),
                 new LanguageReloadListener());

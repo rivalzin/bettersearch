@@ -11,17 +11,8 @@ import net.minecraft.network.chat.Component;
 
 import java.util.function.Consumer;
 
-/**
- * Interruptor de ligar/desligar, com o botao deslizando de um lado para o outro.
- *
- * <p>A animacao e calculada a partir do relogio ({@link Util#getMillis()}), nao do numero de
- * quadros, entao ela dura os mesmos 140 ms tanto a 30 quanto a 240 FPS.
- *
- * <p>Desenhado apenas com retangulos, sem textura nenhuma: funciona com qualquer resource
- * pack e em qualquer versao/loader.
- */
+// the knob animates on render time, not on tick
 public final class ToggleSwitch extends AbstractWidget {
-
     public static final int WIDTH = 28;
     public static final int HEIGHT = 14;
     private static final int KNOB_WIDTH = 10;
@@ -37,7 +28,7 @@ public final class ToggleSwitch extends AbstractWidget {
         this.value = value;
         this.onChange = onChange;
         this.animationFrom = value ? 1.0F : 0.0F;
-        this.animationStart = 0L; // ja terminada
+        this.animationStart = 0L;
     }
 
     public boolean value() {
@@ -45,7 +36,7 @@ public final class ToggleSwitch extends AbstractWidget {
     }
 
     @Override
-    @SuppressWarnings("deprecation") // o NeoForge prefere onClick(x, y, botao), que por padrao chama este
+    @SuppressWarnings("deprecation")
     public void onClick(double mouseX, double mouseY) {
         set(!value);
     }
@@ -59,7 +50,6 @@ public final class ToggleSwitch extends AbstractWidget {
         }
     }
 
-    /** 0 = desligado (botao a esquerda), 1 = ligado (botao a direita). */
     private float animation() {
         float target = value ? 1.0F : 0.0F;
         long elapsed = Util.getMillis() - animationStart;
@@ -67,7 +57,7 @@ public final class ToggleSwitch extends AbstractWidget {
             return target;
         }
         float progress = elapsed / (float) ANIMATION_MS;
-        progress = progress * progress * (3.0F - 2.0F * progress); // suaviza o comeco e o fim
+        progress = progress * progress * (3.0F - 2.0F * progress);
         return animationFrom + (target - animationFrom) * progress;
     }
 

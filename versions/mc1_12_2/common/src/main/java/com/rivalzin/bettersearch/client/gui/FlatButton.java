@@ -4,14 +4,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiButton;
 
-/**
- * Botao discreto: preto chapado semitransparente, sem borda e sem textura.
- *
- * <p>Usado nos links do rodape, onde um botao vanilla cinza roubaria atencao das opcoes.
- * Ao passar o mouse ele escurece um pouco e o texto assume a cor de destaque do mod.
- */
-public final class FlatButton extends GuiButton implements Acionavel {
-
+// no vanilla button texture: this one is flat so it looks the same on every version
+public final class FlatButton extends GuiButton implements Pressable {
     private static final int BACKGROUND = 0x66000000;
     private static final int BACKGROUND_HOVER = 0xAA000000;
 
@@ -22,23 +16,17 @@ public final class FlatButton extends GuiButton implements Acionavel {
         this.onPress = onPress;
     }
 
-    /** Largura sugerida para caber o texto com uma folga confortavel. */
     public static int widthFor(String label) {
         return Minecraft.getMinecraft().fontRenderer.getStringWidth(label) + 16;
     }
 
     @Override
-    public void aoApertar() {
+    public void onPress() {
         onPress.run();
     }
 
     @Override
     public void drawButton(Minecraft mc, int mouseX, int mouseY, float partialTicks) {
-        /*
-         * O drawButton vanilla comeca conferindo visible e recalculando hovered; ao trocar o
-         * desenho inteiro, essas duas linhas vem junto - sem elas o botao apareceria mesmo
-         * escondido pela rolagem e nunca acenderia no hover.
-         */
         if (!this.visible) {
             return;
         }

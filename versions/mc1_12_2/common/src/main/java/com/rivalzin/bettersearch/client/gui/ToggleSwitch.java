@@ -6,18 +6,8 @@ import net.minecraft.client.gui.GuiButton;
 
 import java.util.function.Consumer;
 
-/**
- * Interruptor de ligar/desligar, com o botao deslizando de um lado para o outro.
- *
- * <p>A animacao e calculada a partir do relogio ({@link Minecraft#getSystemTime()} - o
- * {@code Util.getMillis()} desta era, conferido com javap), nao do numero de quadros, entao
- * ela dura os mesmos 140 ms tanto a 30 quanto a 240 FPS.
- *
- * <p>Desenhado apenas com retangulos, sem textura nenhuma: funciona com qualquer resource
- * pack e em qualquer versao/loader.
- */
-public final class ToggleSwitch extends GuiButton implements Acionavel {
-
+// the knob animates on render time, not on tick
+public final class ToggleSwitch extends GuiButton implements Pressable {
     public static final int WIDTH = 28;
     public static final int HEIGHT = 14;
     private static final int KNOB_WIDTH = 10;
@@ -28,17 +18,12 @@ public final class ToggleSwitch extends GuiButton implements Acionavel {
     private float animationFrom;
     private long animationStart;
 
-    /**
-     * O quarto parametro era a narracao do leitor de tela. O Narrator desta era so le chat,
-     * nunca botoes, entao o texto vira o displayString - que este widget nem desenha. Fica
-     * so para as chamadas das telas continuarem identicas as das outras versoes.
-     */
     public ToggleSwitch(int x, int y, boolean value, String narration, Consumer<Boolean> onChange) {
         super(0, x, y, WIDTH, HEIGHT, narration);
         this.value = value;
         this.onChange = onChange;
         this.animationFrom = value ? 1.0F : 0.0F;
-        this.animationStart = 0L; // ja terminada
+        this.animationStart = 0L;
     }
 
     public boolean value() {
@@ -46,7 +31,7 @@ public final class ToggleSwitch extends GuiButton implements Acionavel {
     }
 
     @Override
-    public void aoApertar() {
+    public void onPress() {
         set(!value);
     }
 
@@ -59,7 +44,6 @@ public final class ToggleSwitch extends GuiButton implements Acionavel {
         }
     }
 
-    /** 0 = desligado (botao a esquerda), 1 = ligado (botao a direita). */
     private float animation() {
         float target = value ? 1.0F : 0.0F;
         long elapsed = Minecraft.getSystemTime() - animationStart;
@@ -67,7 +51,7 @@ public final class ToggleSwitch extends GuiButton implements Acionavel {
             return target;
         }
         float progress = elapsed / (float) ANIMATION_MS;
-        progress = progress * progress * (3.0F - 2.0F * progress); // suaviza o comeco e o fim
+        progress = progress * progress * (3.0F - 2.0F * progress);
         return animationFrom + (target - animationFrom) * progress;
     }
 

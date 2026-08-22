@@ -13,19 +13,8 @@ import net.minecraft.network.chat.Component;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Liga e desliga, um a um, todos os idiomas que o jogo conhece.
- *
- * <p>A lista vem do proprio Minecraft, entao inclui idiomas trazidos por resource packs e
- * nunca fica desatualizada. Com mais de cem entradas, ha uma barra de busca no painel da
- * direita: ela filtra por nome ou por codigo e usa a mesma normalizacao do mod, entao
- * digitar "portugues" encontra "Português".
- *
- * <p>O idioma em uso no jogo funciona sempre, ligado ou nao: o nome que aparece na tela ja
- * e indexado direto do item.
- */
+// the list is what the resource packs actually ship, not a hardcoded table
 public final class LanguageSelectScreen extends OptionRowsScreen {
-
     private final SearchSettings settings;
     private final List<LanguageCatalog.Entry> languages;
     private final String currentCode;
@@ -79,8 +68,6 @@ public final class LanguageSelectScreen extends OptionRowsScreen {
         int width = panelWidth() - 12;
         int y = panelFooterTop() + 4;
 
-        // A mesma caixa e reaproveitada entre reconstrucoes, para nao perder o que foi
-        // digitado nem o cursor quando a lista e refiltrada a cada tecla.
         if (searchBox == null) {
             searchBox = new EditBox(this.font, x, y, width, BUTTON_HEIGHT,
                     Component.translatable("bettersearch.config.languages.search"));
@@ -124,8 +111,6 @@ public final class LanguageSelectScreen extends OptionRowsScreen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
-        // Refiltrar dentro do responder da caixa mexeria na lista de widgets no meio do
-        // despacho do evento de teclado; adiamos para o inicio do quadro seguinte.
         if (needsRebuild) {
             needsRebuild = false;
             rebuildWidgets();
@@ -147,8 +132,6 @@ public final class LanguageSelectScreen extends OptionRowsScreen {
                 enabledCount(), languages.size(), currentCode);
     }
 
-    // ------------------------------------------------------------------ estado
-
     private boolean isEnabled(String code) {
         return settings.indexesAllLanguages() || settings.languages.contains(code);
     }
@@ -164,7 +147,6 @@ public final class LanguageSelectScreen extends OptionRowsScreen {
     }
 
     private void setEnabled(String code, boolean enabled) {
-        // Troca o coringa "*" pela lista explicita, senao desligar um idioma nao teria efeito.
         if (settings.indexesAllLanguages()) {
             settings.languages = allCodes();
         }

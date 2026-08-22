@@ -1,35 +1,17 @@
 package com.rivalzin.bettersearch.core;
 
-/**
- * Compara UM texto solto com a consulta, sem montar indice nenhum.
- *
- * <p>O {@link SearchIndex} vale a pena para milhares de itens, onde o pre-processamento se
- * paga. Para listas curtas - nomes de mods, nomes de jogadores online - montar um indice
- * custaria mais do que a busca. Esta classe usa exatamente o mesmo algoritmo (mesmas
- * camadas, mesma normalizacao, mesma tolerancia a erro) em cima de um texto por vez.
- *
- * <p>Java puro, testavel sem Minecraft.
- */
 public final class QuickMatcher {
-
-    /** Devolvido quando o texto nao casa com a consulta. */
     public static final int NO_MATCH = Integer.MIN_VALUE;
 
     private QuickMatcher() {
     }
 
-    /** Atalho para um unico teste. Para varios textos, reaproveite o {@link Session}. */
     public static boolean matches(String rawText, String rawQuery, SearchSettings settings) {
         return new Session(rawQuery, settings).score(rawText) != NO_MATCH;
     }
 
-    /**
-     * Consulta preparada uma vez e reutilizada para varios textos.
-     *
-     * <p>Nao e thread-safe (guarda um buffer de trabalho); use uma por laco de busca.
-     */
+    // one Session per query, reused across every item in the list
     public static final class Session {
-
         private final SearchQuery query;
         private final SearchSettings settings;
         private final MatchPolicy policy;
@@ -45,7 +27,6 @@ public final class QuickMatcher {
             return query.tokens.length == 0;
         }
 
-        /** Pontuacao do texto (quanto maior, melhor), ou {@link #NO_MATCH}. */
         public int score(String rawText) {
             if (rawText == null || rawText.isEmpty()) {
                 return NO_MATCH;

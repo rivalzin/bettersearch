@@ -21,22 +21,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
-/**
- * Traducoes de itens em varios idiomas ao mesmo tempo.
- *
- * <p>O jogo so mantem carregado o idioma selecionado. Aqui lemos direto os
- * {@code assets/<namespace>/lang/<codigo>.json} de todos os pacotes de recursos - exatamente
- * como o {@code ClientLanguage} faz - para os idiomas configurados. E o que permite escrever
- * "pomme" com o jogo em portugues.
- *
- * <p>So guardamos chaves de item/bloco ({@code item.*} e {@code block.*}), o que descarta
- * ~80% de cada arquivo e mantem o uso de memoria baixo.
- *
- * <p>Esta classe toca Minecraft apenas atraves de {@code ResourceManager} e
- * {@code Identifier}, que existem em qualquer loader.
- */
 public final class LanguageTable {
-
     public static final LanguageTable EMPTY = new LanguageTable(Map.of(), List.of(), Set.of());
 
     private final Map<String, Map<String, String>> byLanguage;
@@ -49,10 +34,7 @@ public final class LanguageTable {
         this.requested = requested;
     }
 
-    /**
-     * Quais idiomas esta configuracao pede. Guardar o pedido - e nao so o resultado -
-     * permite saber se a tabela precisa ser relida quando o usuario liga um idioma novo.
-     */
+    // a star means every language the packs ship
     public static Set<String> requestFor(SearchSettings settings) {
         if (!settings.crossLanguage) {
             return Set.of();
@@ -63,17 +45,14 @@ public final class LanguageTable {
         return new LinkedHashSet<>(settings.languages);
     }
 
-    /** A tabela ja cobre exatamente o que esta configuracao pede? */
     public boolean matchesRequest(SearchSettings settings) {
         return requested.equals(requestFor(settings));
     }
 
-    /** Codigos de idioma carregados, na ordem em que devem ser indexados. */
     public List<String> languageCodes() {
         return order;
     }
 
-    /** Traducao de {@code key} em {@code language}, ou {@code null}. */
     public String get(String language, String key) {
         Map<String, String> map = byLanguage.get(language);
         return map == null ? null : map.get(key);
@@ -91,31 +70,13 @@ public final class LanguageTable {
         return total;
     }
 
-    /**
-     * Le os idiomas pedidos. Deve ser chamado na fase de "prepare" de um reload listener
-     * (ou seja, fora da thread principal) porque le arquivos.
-     *
-     * <p><b>Por que uma listagem, e nao uma busca caminho por caminho.</b> A versao antiga
-     * perguntava a cada pacote de recursos "voce tem {@code lang/<idioma>.json}?" - uma vez
-     * para cada idioma vezes cada namespace. Com 18 idiomas e 50 mods, ~900 perguntas por
-     * recarga.
-     *
-     * <p>Um pacote de recursos <i>deve</i> responder "nao tenho" quando o arquivo nao existe,
-     * mas nem todos respeitam isso: alguns lancam excecao. Como a leitura acontece durante a
-     * carga de recursos, uma excecao dali derruba o jogo <b>antes do menu principal</b> - e o
-     * mod que faz a pergunta somos nos, porque nenhum outro pede 18 idiomas de uma vez.
-     *
-     * <p>Pedindo a LISTA do que existe, so tocamos em arquivos que o proprio jogo garantiu
-     * estarem la. Nenhum pacote e provocado com pergunta sobre arquivo ausente, e de quebra
-     * as ~900 consultas viram uma so.
-     */
     public static LanguageTable load(ResourceManager resourceManager, SearchSettings settings) {
         if (!settings.crossLanguage) {
             return EMPTY;
         }
 
         Set<String> request = requestFor(settings);
-        // null = "todos os idiomas"; caso contrario, so os escolhidos.
+
         Set<String> wanted = settings.indexesAllLanguages() ? null : new LinkedHashSet<>(settings.languages);
         if (wanted != null) {
             wanted.remove("*");
@@ -128,8 +89,7 @@ public final class LanguageTable {
         try {
             available = resourceManager.listResourceStacks("lang", path -> path.getPath().endsWith(".json"));
         } catch (Exception e) {
-            // Sem lista, seguimos sem busca entre idiomas. O resto do mod continua inteiro.
-            BetterSearch.LOGGER.warn("[{}] nao consegui listar os arquivos de idioma",
+            BetterSearch.LOGGER.warn("[{}] could not list language files",
                     BetterSearch.MOD_NAME, e);
             return new LanguageTable(Map.of(), List.of(), request);
         }
@@ -146,16 +106,12 @@ public final class LanguageTable {
                     readInto(resource, translations);
                 }
             } catch (Exception e) {
-                // Um pacote mal-comportado atrapalha o proprio idioma dele, e mais nada.
-                BetterSearch.LOGGER.debug("[{}] pacote de idioma ignorado ({}): {}",
+                BetterSearch.LOGGER.debug("[{}] language pack skipped ({}): {}",
                         BetterSearch.MOD_NAME, entry.getKey(), e.toString());
             }
         }
         result.values().removeIf(Map::isEmpty);
 
-        // A ordem importa na hora de indexar, entao ela e deliberada: quando o usuario
-        // escolheu os idiomas, respeitamos a ordem dele; em "todos", ordem alfabetica para
-        // o resultado ser sempre o mesmo.
         List<String> order = new ArrayList<>();
         if (wanted != null) {
             for (String code : wanted) {
@@ -167,13 +123,12 @@ public final class LanguageTable {
             order.addAll(new TreeSet<>(result.keySet()));
         }
 
-        BetterSearch.LOGGER.info("[{}] {} idiomas indexados ({} traducoes de itens): {}",
+        BetterSearch.LOGGER.info("[{}] {} languages indexed ({} item strings): {}",
                 BetterSearch.MOD_NAME, order.size(),
                 result.values().stream().mapToInt(Map::size).sum(), order);
         return new LanguageTable(result, List.copyOf(order), request);
     }
 
-    /** {@code "lang/pt_br.json"} -> {@code "pt_br"}, ou {@code null} se nao parecer idioma. */
     private static String languageCodeOf(String path) {
         if (!path.endsWith(".json")) {
             return null;
@@ -204,15 +159,11 @@ public final class LanguageTable {
             }
             json.endObject();
         } catch (Exception e) {
-            // Um arquivo de idioma quebrado de algum mod nao pode derrubar a busca inteira.
-            BetterSearch.LOGGER.debug("[{}] arquivo de idioma ignorado: {}", BetterSearch.MOD_NAME, e.toString());
+            BetterSearch.LOGGER.debug("[{}] skipped language file: {}", BetterSearch.MOD_NAME, e.toString());
         }
     }
 
-    /**
-     * Guardamos so o que pode ser nome de item. As chaves de traducao geradas por
-     * {@code Item#getDescriptionId} sempre comecam com {@code item.} ou {@code block.}.
-     */
+    // only item and block keys, the rest of the lang file is noise here
     private static boolean isInteresting(String key) {
         return key.startsWith("item.") || key.startsWith("block.");
     }

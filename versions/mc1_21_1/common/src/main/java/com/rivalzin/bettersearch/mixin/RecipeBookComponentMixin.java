@@ -12,24 +12,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.List;
 
-/**
- * Busca do livro de receitas.
- *
- * <p>Dois ganchos, cada um com um papel:
- *
- * <ul>
- *   <li>em {@code tick} pedimos para o indice ser montado. A tela do inventario chama isto
- *       todo tique, entao quando voce clica na lupa o indice ja esta pronto. Sem isso a
- *       busca so passaria a funcionar da terceira letra em diante - e, se voce parasse de
- *       digitar antes disso, nunca, porque o livro so refaz a busca quando o texto muda;</li>
- *   <li>em {@code updateCollections} trocamos apenas a pergunta feita a arvore de busca
- *       vanilla. Tudo o que o metodo faz em volta (receitas conhecidas, filtro de "posso
- *       fabricar", paginacao) continua sendo trabalho do proprio Minecraft.</li>
- * </ul>
- */
 @Mixin(RecipeBookComponent.class)
 public abstract class RecipeBookComponentMixin {
-
+    // the recipe book rebuilds its list here, after the search box changed
     @Inject(method = "tick", at = @At("HEAD"))
     private void bettersearch$prepareIndex(CallbackInfo ci) {
         RecipeSearch.prepare();

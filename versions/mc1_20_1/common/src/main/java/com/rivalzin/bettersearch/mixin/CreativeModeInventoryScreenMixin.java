@@ -14,32 +14,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.Collection;
 import java.util.List;
 
-/**
- * Unico ponto de contato com o codigo do Minecraft.
- *
- * <p>A injecao acontece no <b>RETURN</b> de {@code refreshSearchResults}: deixamos a busca
- * original rodar normalmente e so trocamos a lista de itens depois. Isso e proposital:
- *
- * <ul>
- *   <li>nao precisamos replicar nada do que o metodo faz (limpar tags visiveis, zerar o
- *       scroll, tratar {@code #tag}), entao ha bem menos coisa para quebrar em outra versao;</li>
- *   <li>se o indice ainda estiver sendo montado, ou se o mod estiver desligado, os resultados
- *       da busca original ja estao la e nada acontece - nunca ha uma tela vazia;</li>
- *   <li>o custo extra e desprezivel: a arvore de busca vanilla e O(tamanho da consulta).</li>
- * </ul>
- *
- * <p>Para portar: os unicos nomes ligados a versao/mapeamento estao aqui
- * ({@code refreshSearchResults}, {@code searchBox}, {@code selectedTab}).
- */
 @Mixin(CreativeModeInventoryScreen.class)
 public abstract class CreativeModeInventoryScreenMixin {
-
     @Shadow
     private EditBox searchBox;
 
     @Shadow
     private static CreativeModeTab selectedTab;
 
+    // the descriptor is pinned: vanilla renamed this method twice already
     @Inject(method = "refreshSearchResults", at = @At("RETURN"))
     private void bettersearch$refreshSearchResults(CallbackInfo ci) {
         if (!BetterSearchClient.isEnabled()) {
@@ -54,8 +37,6 @@ public abstract class CreativeModeInventoryScreenMixin {
         Collection<ItemStack> pool = tab.getDisplayItems();
         String query = box.getValue();
 
-        // Consulta vazia mostra a aba inteira, e '#' e busca por tag: os dois continuam
-        // sendo trabalho da busca original. Aproveitamos para ja preparar o indice.
         if (query.isEmpty() || query.charAt(0) == '#') {
             BetterSearchClient.prepare(pool);
             return;
@@ -63,7 +44,7 @@ public abstract class CreativeModeInventoryScreenMixin {
 
         List<ItemStack> results = BetterSearchClient.search(query, pool);
         if (results == null) {
-            return; // indice ainda montando ou mod desligado -> resultado original
+            return;
         }
 
         CreativeModeInventoryScreen screen = (CreativeModeInventoryScreen) (Object) this;
