@@ -56,8 +56,6 @@ Below are some useful settings that make this mod stand out from similar alterna
 
 ---
 
-[![github-plural](https://cdn.jsdelivr.net/npm/@intergrav/devins-badges@3/assets/compact/social/github-plural_vector.svg)](https://github.com/rivalzin/bettersearch)
-
 [![Code license (MIT)](https://img.shields.io/badge/code%20license-MIT-green.svg?style=flat-square)](https://github.com/rivalzin/bettersearch/blob/main/LICENSE)
 
 <p align="center">
