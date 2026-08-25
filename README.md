@@ -59,11 +59,5 @@ Below are some useful settings that make this mod stand out from similar alterna
 [![Code license (MIT)](https://img.shields.io/badge/code%20license-MIT-green.svg?style=flat-square)](https://github.com/rivalzin/bettersearch/blob/main/LICENSE)
 
 <p align="center">
-  <sub>Mod made by <a href="https://github.com/rivalzin">Rivalzin</a> (me :D), page design inspired by <a href="https://github.com/Terrunic">Terrunic</a> and <a href="https://github.com/evanbones">Evan Bowness</a></sub>
+  <sub> This code was partially made with help of Artificial Inteligence, the owner of the mod do not support the use of Generative AI over real devs or in any scenario, and do not want or wanted to cause any harm to real devs. All the parts besides the code was 100% made by humans, including the code review.</a></sub>
 </p>
-</p>
-</p>
-<p align="center">
-  This code was partially made with help of Artificial Inteligence, the owner of the mod do not support the use of AI over real devs and do not want or wanted to cause any harm to real devs. All the parts besides the code was 100% made by human, including the code review. Don't be a loser like me and do not use IA.
-</p>
-
