@@ -12,6 +12,7 @@ public final class JeiIntegration {
     private static Field treesField;
     private static boolean announced;
     private static int appliedStamp = -1;
+    private static int appliedGeneration = -1;
 
     private JeiIntegration() {
     }
@@ -39,8 +40,11 @@ public final class JeiIntegration {
         }
 
         int stamp = ModConfig.stamp();
-        if (changed || stamp != appliedStamp) {
+        // the config stamp misses the language table and the off-thread build
+        int generation = JeiSearchBridge.generation();
+        if (changed || stamp != appliedStamp || generation != appliedGeneration) {
             appliedStamp = stamp;
+            appliedGeneration = generation;
             filter.invalidateCache();
         }
     }

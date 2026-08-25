@@ -1,9 +1,11 @@
 package com.rivalzin.bettersearch.fabric;
 
-import com.rivalzin.bettersearch.client.gui.BetterSearchConfigScreen;
+import com.rivalzin.bettersearch.client.BetterSearchClient;
+import com.rivalzin.bettersearch.client.KeyConflictGuard;
+import com.rivalzin.bettersearch.client.ShortcutWatcher;
+import com.rivalzin.bettersearch.core.ShortcutRule;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.screens.Screen;
 import org.lwjgl.glfw.GLFW;
@@ -16,16 +18,20 @@ public final class BetterSearchFabricKeys {
             GLFW.GLFW_KEY_O,
             CATEGORY);
 
-    private static Screen screenAtLastTickEnd;
-    private static boolean openNextTick;
-    private static boolean oWasDown;
+    // written inside the press, read at the end of the tick
+    private static boolean pending;
 
     private BetterSearchFabricKeys() {
     }
 
+    /** The Alt belongs to the default key: moved anywhere else, the key answers on its own. */
+    static boolean needsAlt() {
+        return OPEN_CONFIG.isDefault();
+    }
+
     // alt is a modifier in iris and in the shader screens, do not steal it there
     public static boolean shouldBlock(Screen screen) {
-        if (screen == null || !Screen.hasAltDown() || !OPEN_CONFIG.isDefault()) {
+        if (screen == null || !Screen.hasAltDown() || !needsAlt()) {
             return false;
         }
         String name = screen.getClass().getName();
@@ -35,30 +41,25 @@ public final class BetterSearchFabricKeys {
 
     public static void register() {
         KeyBindingHelper.registerKeyBinding(OPEN_CONFIG);
+        ShortcutWatcher.listen(BetterSearchFabricKeys::onKeyPress);
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (openNextTick) {
-                openNextTick = false;
-                if (!(client.screen instanceof BetterSearchConfigScreen)) {
-                    client.setScreen(new BetterSearchConfigScreen(null));
-                }
-            }
-
-            boolean oNow = InputConstants.isKeyDown(client.getWindow().getWindow(), GLFW.GLFW_KEY_O);
-            if (oNow && !oWasDown && OPEN_CONFIG.isDefault()
-                    && Screen.hasAltDown() && screenAtLastTickEnd == null) {
-                if (!(client.screen instanceof BetterSearchConfigScreen)) {
-                    client.setScreen(new BetterSearchConfigScreen(null));
-                }
-                openNextTick = true;
-            }
-            oWasDown = oNow;
-
+            KeyConflictGuard.update(OPEN_CONFIG, needsAlt(), Screen.hasAltDown());
             while (OPEN_CONFIG.consumeClick()) {
-                if (Screen.hasAltDown() && screenAtLastTickEnd == null) {
-                    openNextTick = true;
-                }
+                // the press already came in through ShortcutWatcher, with the Alt read at the
+                // right moment; the copy vanilla kept is dropped here
             }
-            screenAtLastTickEnd = client.screen;
+            if (pending) {
+                pending = false;
+                BetterSearchClient.openConfigScreen();
+            }
         });
+    }
+
+    // runs inside the press, so the Alt is still under the finger when it is read
+    private static void onKeyPress(String keyName) {
+        String bound = OPEN_CONFIG.isUnbound() ? null : OPEN_CONFIG.saveString();
+        if (ShortcutRule.opens(keyName, bound, needsAlt(), Screen.hasAltDown())) {
+            pending = true;
+        }
     }
 }

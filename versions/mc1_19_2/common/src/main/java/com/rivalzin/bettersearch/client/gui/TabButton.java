@@ -10,7 +10,7 @@ import net.minecraft.network.chat.Component;
 
 import java.util.function.BooleanSupplier;
 
-// active tab is drawn last so its border wins the overlap
+// flat tab with its own border: the accent line under it is what marks the active one
 public final class TabButton extends AbstractWidget {
     public static final int HEIGHT = 20;
 

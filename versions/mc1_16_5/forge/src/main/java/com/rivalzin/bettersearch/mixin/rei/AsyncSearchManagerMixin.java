@@ -23,6 +23,7 @@ public abstract class AsyncSearchManagerMixin {
         if (found == null || filter == null) {
             return;
         }
+        ReiSearch.rememberManager((AsyncSearchManager) (Object) this);
 
         List<EntryStack<?>> ours = ReiSearch.reorder(filter, found, entry -> entry);
         if (ours != null) {

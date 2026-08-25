@@ -73,7 +73,7 @@ public final class QuickMatcher {
             if (startsAtBeginning) {
                 score += 150;
             }
-            score += (int) (400L * matchedChars / Math.max(1, normalized.length()));
+            score += (int) Math.min(400L, 400L * matchedChars / Math.max(1, normalized.length()));
             score -= 150 * totalDistance;
             return score;
         }

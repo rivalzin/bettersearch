@@ -53,8 +53,7 @@ public abstract class CreativeModeInventoryScreenMixin {
         String query = box.getValue();
 
         if (query.isEmpty()) {
-            bettersearch$remember(new ArrayList<>(menu.items));
-            BetterSearchClient.prepare(bettersearch$pool);
+            BetterSearchClient.prepare(bettersearch$poolOf(menu.items));
             return;
         }
         if (query.charAt(0) == '#') {
@@ -70,6 +69,21 @@ public abstract class CreativeModeInventoryScreenMixin {
         menu.items.clear();
         menu.items.addAll(results);
         menu.scrollTo(0.0F);
+    }
+
+    // the empty box hands back the whole list on every open and every backspace, and a new
+    // copy each time would look like a new pool and rebuild the index from scratch
+    @Unique
+    @SuppressWarnings("deprecation")
+    private static List<ItemStack> bettersearch$poolOf(List<ItemStack> items) {
+        List<ItemStack> cached = bettersearch$pool;
+        if (cached != null && cached.size() == items.size()
+                && bettersearch$poolRegistrySize == Registry.ITEM.keySet().size()) {
+            return cached;
+        }
+        List<ItemStack> fresh = new ArrayList<>(items);
+        bettersearch$remember(fresh);
+        return fresh;
     }
 
     @Unique

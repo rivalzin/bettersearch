@@ -64,13 +64,6 @@ public final class LanguageTable {
         return byLanguage.isEmpty();
     }
 
-    public int entryCount() {
-        int total = 0;
-        for (Map<String, String> map : byLanguage.values()) {
-            total += map.size();
-        }
-        return total;
-    }
 
     public static LanguageTable load(ResourceManager resourceManager, SearchSettings settings) {
         if (!settings.crossLanguage) {
@@ -81,7 +74,6 @@ public final class LanguageTable {
 
         Set<String> wanted = settings.indexesAllLanguages() ? null : new LinkedHashSet<>(settings.languages);
         if (wanted != null) {
-            wanted.remove("*");
             if (wanted.isEmpty()) {
                 return new LanguageTable(Map.of(), List.of(), request);
             }

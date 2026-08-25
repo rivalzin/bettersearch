@@ -2,11 +2,13 @@ package com.rivalzin.bettersearch.forge;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.rivalzin.bettersearch.client.BetterSearchClient;
+import com.rivalzin.bettersearch.client.KeyConflictGuard;
 import net.minecraft.client.KeyMapping;
-import net.minecraftforge.fml.client.registry.ClientRegistry;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraftforge.client.settings.KeyConflictContext;
 import net.minecraftforge.client.settings.KeyModifier;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.fml.client.registry.ClientRegistry;
 import org.lwjgl.glfw.GLFW;
 
 public final class BetterSearchForgeKeys {
@@ -31,6 +33,13 @@ public final class BetterSearchForgeKeys {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
+
+        BetterSearchClient.warmUp();
+
+        // a control on the same key stands down while Alt is held; drop the Alt
+        // from the shortcut and nothing is held back
+        KeyConflictGuard.update(OPEN_CONFIG, OPEN_CONFIG.getKeyModifier() == KeyModifier.ALT,
+                Screen.hasAltDown());
 
         while (OPEN_CONFIG.consumeClick()) {
             BetterSearchClient.openConfigScreen();

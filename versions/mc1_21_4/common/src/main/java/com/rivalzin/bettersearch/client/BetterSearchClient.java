@@ -17,7 +17,8 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public final class BetterSearchClient {
-    private static SearchSettings settings = new SearchSettings();
+    // read from the EMI and REI worker threads, written on the client thread
+    private static volatile SearchSettings settings = new SearchSettings();
     private static volatile LanguageTable languages = LanguageTable.EMPTY;
     private static Path configFile;
 
@@ -26,12 +27,13 @@ public final class BetterSearchClient {
     private static int indexedSize = -1;
     private static long indexedStamp = -1;
 
-    // bumped on every reload so every cache downstream knows to drop
-    private static long languageStamp;
+    // bumped on every reload; volatile because a long is not read atomically on 32 bit
+    private static volatile long languageStamp;
     private static boolean building;
     private static boolean resourcesReady;
-    // one throw and the mod stands down for the session instead of spamming
-    private static boolean disabledByError;
+    // one throw and the mod stands down for the session instead of spamming;
+    // volatile because the viewer threads read it through isEnabled()
+    private static volatile boolean disabledByError;
 
     private static Object pendingSource;
     private static int pendingSize;
@@ -62,11 +64,14 @@ public final class BetterSearchClient {
         cachedQuery = null;
         cachedResults = null;
 
-        if (previous == null || newSettings.affectsIndex(previous)) {
+        if (newSettings.affectsIndex(previous)) {
             invalidate();
         }
         reloadLanguagesIfNeeded();
     }
+
+    // minecraft.execute queues by finish order, so the older reload could win
+    private static int languageRequest;
 
     private static void reloadLanguagesIfNeeded() {
         if (!resourcesReady || languages.matchesRequest(settings)) {
@@ -78,12 +83,16 @@ public final class BetterSearchClient {
         }
         final ResourceManager resourceManager = minecraft.getResourceManager();
         final SearchSettings snapshot = settings.copy();
+        final int request = ++languageRequest;
         CompletableFuture
                 .supplyAsync(() -> LanguageTable.load(resourceManager, snapshot), Util.backgroundExecutor())
                 .whenComplete((table, error) -> minecraft.execute(() -> {
                     if (error != null) {
                         BetterSearch.LOGGER.error("[{}] failed to reload languages",
                                 BetterSearch.MOD_NAME, error);
+                        return;
+                    }
+                    if (request != languageRequest) {
                         return;
                     }
                     onLanguagesLoaded(table);
@@ -107,6 +116,10 @@ public final class BetterSearchClient {
             ConfigIo.save(configFile, settings);
         }
 
+        notifySettingsApplied();
+    }
+
+    private static void notifySettingsApplied() {
         for (Runnable listener : settingsAppliedListeners) {
             try {
                 listener.run();
@@ -137,6 +150,8 @@ public final class BetterSearchClient {
         resourcesReady = true;
         languageStamp++;
         invalidate();
+        // the table lands after applyAndSave, so the viewers need a second poke
+        notifySettingsApplied();
     }
 
     public static void invalidate() {
@@ -154,6 +169,7 @@ public final class BetterSearchClient {
 
         languageStamp++;
     }
+
 
     public static boolean isEnabled() {
         return settings.enabled && !disabledByError;

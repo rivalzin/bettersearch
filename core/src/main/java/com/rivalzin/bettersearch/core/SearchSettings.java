@@ -24,6 +24,8 @@ public final class SearchSettings {
 
     public boolean fixCommandErrors = true;
 
+    public boolean fixVersionNames = true;
+
     public int commandSuggestionLimit = 12;
 
     public boolean searchJei = true;
@@ -70,6 +72,7 @@ public final class SearchSettings {
         s.searchPlayerNames = searchPlayerNames;
         s.searchCommandItems = searchCommandItems;
         s.fixCommandErrors = fixCommandErrors;
+        s.fixVersionNames = fixVersionNames;
         s.commandSuggestionLimit = commandSuggestionLimit;
         s.searchJei = searchJei;
         s.searchEmi = searchEmi;
@@ -128,7 +131,13 @@ public final class SearchSettings {
         return crossLanguage != other.crossLanguage
                 || searchTooltips != other.searchTooltips
                 || searchItemIds != other.searchItemIds
-                || !java.util.Objects.equals(languages, other.languages);
+                || !sameLanguages(languages, other.languages);
+    }
+
+    // the list is a set here too: turning a language off and back on used to look like a
+    // change and threw away every lang file the pack ships
+    public boolean affectsLanguageTable(SearchSettings other) {
+        return crossLanguage != other.crossLanguage || !sameLanguages(languages, other.languages);
     }
 
     private static int clamp(int v, int min, int max) {
@@ -150,6 +159,7 @@ public final class SearchSettings {
                 && searchPlayerNames == s.searchPlayerNames
                 && searchCommandItems == s.searchCommandItems
                 && fixCommandErrors == s.fixCommandErrors
+                && fixVersionNames == s.fixVersionNames
                 && commandSuggestionLimit == s.commandSuggestionLimit
                 && searchJei == s.searchJei
                 && searchEmi == s.searchEmi
@@ -168,17 +178,30 @@ public final class SearchSettings {
                 && crossFieldMatching == s.crossFieldMatching
                 && crossFieldThreshold == s.crossFieldThreshold
                 && maxResults == s.maxResults
-                && java.util.Objects.equals(languages, s.languages);
+                && sameLanguages(languages, s.languages);
     }
 
     @Override
     public int hashCode() {
         return java.util.Objects.hash(enabled, searchCreative, searchRecipeBook,
-                searchPlayerNames, searchCommandItems, fixCommandErrors, commandSuggestionLimit,
+                searchPlayerNames, searchCommandItems, fixCommandErrors, fixVersionNames,
+                commandSuggestionLimit,
                 searchJei, searchEmi, searchRei,
                 typoTolerance, minTypoLength, matchInitials, ignoreSpaces,
                 crossLanguage, foreignStrictOnly, sortByRelevance, searchTooltips, searchItemIds,
-                searchModIds, fuzzyThreshold, crossFieldMatching, crossFieldThreshold, maxResults, languages);
+                searchModIds, fuzzyThreshold, crossFieldMatching, crossFieldThreshold, maxResults,
+                languages == null ? null : new java.util.HashSet<>(languages));
+    }
+
+    // the language list is a set: order never changes what gets indexed
+    private static boolean sameLanguages(java.util.List<String> a, java.util.List<String> b) {
+        if (a == b) {
+            return true;
+        }
+        if (a == null || b == null) {
+            return false;
+        }
+        return new java.util.HashSet<>(a).equals(new java.util.HashSet<>(b));
     }
 
     @Override

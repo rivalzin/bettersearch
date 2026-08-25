@@ -26,16 +26,35 @@ public final class ReiSearch {
     private static java.lang.ref.WeakReference<AsyncSearchManager> managerRef =
             new java.lang.ref.WeakReference<>(null);
 
+    // bumped when a build lands and when the settings change: a filter caches the answer it
+    // gave, so without this the first search stays empty and a toggle looks like a no-op
+    private static volatile int generation;
+
     static {
-        BetterSearchClient.onSettingsApplied(() -> {
-            try {
-                AsyncSearchManager manager = managerRef.get();
-                if (manager != null) {
-                    manager.markDirty();
-                }
-            } catch (Throwable ignored) {
+        BetterSearchClient.onSettingsApplied(ReiSearch::onSettingsChanged);
+    }
+
+    private static void onSettingsChanged() {
+        // the filter keeps the answer it already gave: without a new generation REI redoes
+        // the pass and gets the same list back, so flipping a toggle looked like a no-op
+        generation++;
+        markDirty();
+    }
+
+    private static void markDirty() {
+        try {
+            AsyncSearchManager manager = managerRef.get();
+            if (manager != null) {
+                // reflective: markDirty is REI impl and not every line has it
+                manager.getClass().getMethod("markDirty").invoke(manager);
             }
-        });
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void onIndexReady() {
+        generation++;
+        markDirty();
     }
 
     public static void rememberManager(AsyncSearchManager manager) {
@@ -43,6 +62,7 @@ public final class ReiSearch {
             managerRef = new java.lang.ref.WeakReference<>(manager);
         }
     }
+
 
     private ReiSearch() {
     }
@@ -92,6 +112,7 @@ public final class ReiSearch {
         private final SearchFilter original;
         private final String text;
         private volatile Map<EntryStack<?>, Integer> matched;
+        private volatile int matchedGeneration = -1;
 
         BetterSearchFilter(SearchFilter original, String text) {
             this.original = original;
@@ -119,18 +140,20 @@ public final class ReiSearch {
         }
 
         Map<EntryStack<?>, Integer> positionsIfReady() {
-            return matched;
+            return matchedGeneration == generation ? matched : null;
         }
 
         private Map<EntryStack<?>, Integer> ours() {
+            int now = generation;
             Map<EntryStack<?>, Integer> ready = matched;
-            if (ready != null) {
+            if (ready != null && matchedGeneration == now) {
                 return ready;
             }
             synchronized (this) {
-                if (matched != null) {
+                if (matched != null && matchedGeneration == now) {
                     return matched;
                 }
+                matchedGeneration = now;
                 matched = run(text);
                 return matched;
             }
@@ -214,7 +237,8 @@ public final class ReiSearch {
         final net.minecraft.world.entity.player.Player player = minecraft.player;
 
         return INDEX.get(registry, copy.size(), stamp,
-                () -> ReiIndexBuilder.build(copy, languages, captured, tooltipContext, player));
+                () -> ReiIndexBuilder.build(copy, languages, captured, tooltipContext, player),
+                ReiSearch::onIndexReady);
     }
 
     public static <T> List<T> reorder(SearchFilter filter, List<T> ordered,

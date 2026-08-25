@@ -21,6 +21,35 @@ import java.util.Set;
 public final class ReiSearchBridge {
     private static final String REI_SYNTAX = "#$";
 
+    // REI 5.x keeps the list it built and only rebuilds it when the box changes, so a
+    // settings change has to ask it again or the screen keeps showing the old answer
+    private static java.lang.ref.WeakReference<me.shedaniel.rei.gui.widget.EntryListWidget> listRef =
+            new java.lang.ref.WeakReference<>(null);
+    private static volatile String lastQuery = "";
+
+    static {
+        BetterSearchClient.onSettingsApplied(ReiSearchBridge::searchAgain);
+    }
+
+    public static void remember(me.shedaniel.rei.gui.widget.EntryListWidget list, String query) {
+        if (list != null && listRef.get() != list) {
+            listRef = new java.lang.ref.WeakReference<>(list);
+        }
+        lastQuery = query == null ? "" : query;
+    }
+
+    private static void searchAgain() {
+        try {
+            me.shedaniel.rei.gui.widget.EntryListWidget list = listRef.get();
+            if (list != null) {
+                list.updateSearch(lastQuery, true);
+            }
+        } catch (Throwable t) {
+            BetterSearch.LOGGER.debug("[{}] REI list left as it was: {}",
+                    BetterSearch.MOD_NAME, t.toString());
+        }
+    }
+
     private static volatile SearchIndex<EntryStack> index;
     private static volatile int indexedSize = -1;
     private static volatile long indexedStamp = Long.MIN_VALUE;
@@ -140,8 +169,9 @@ public final class ReiSearchBridge {
         if (id != null && id.isPresent()) {
             ResourceLocation local = id.get();
             builder.modId(local.getNamespace());
+            builder.family(local.getPath());
             if (settings.searchItemIds) {
-                builder.addNormalized(local.getNamespace() + ' '
+                builder.add(local.getNamespace() + ' '
                         + local.getPath().replace('_', ' '), SearchField.SOURCE_ID);
             }
         }

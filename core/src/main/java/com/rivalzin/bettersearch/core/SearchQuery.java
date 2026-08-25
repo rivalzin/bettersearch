@@ -28,8 +28,6 @@ public final class SearchQuery {
     }
 
     public static SearchQuery parse(String rawQuery, SearchSettings settings) {
-        String normalized = TextNormalizer.normalize(rawQuery);
-
         List<String> tokens = new ArrayList<>(4);
         List<String> mods = new ArrayList<>(1);
 
@@ -49,7 +47,7 @@ public final class SearchQuery {
                 }
             }
         } else {
-            addTokens(normalized, tokens);
+            addTokens(TextNormalizer.normalize(rawQuery), tokens);
         }
 
         String[] tokenArray = tokens.toArray(new String[0]);

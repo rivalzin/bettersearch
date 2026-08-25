@@ -12,6 +12,7 @@ import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.tree.ArgumentCommandNode;
 import com.mojang.brigadier.tree.CommandNode;
 import com.rivalzin.bettersearch.BetterSearch;
+import com.rivalzin.bettersearch.core.CommandAliases;
 import com.rivalzin.bettersearch.core.CommandFuzzy;
 import com.rivalzin.bettersearch.core.QuickMatcher;
 import com.rivalzin.bettersearch.core.SearchSettings;
@@ -51,7 +52,7 @@ public final class CommandSearch {
         return BetterSearchClient.isEnabled()
                 // only the tab list, the server never gets asked
                 && (settings.searchPlayerNames || settings.searchCommandItems
-                    || settings.fixCommandErrors);
+                    || settings.fixCommandErrors || settings.fixVersionNames);
     }
 
     // red = nothing found, gold = we have a spelling for it
@@ -60,9 +61,10 @@ public final class CommandSearch {
     private static final Style FIXABLE = Style.EMPTY.withColor(ChatFormatting.GOLD);
 
     public static Style unparsedStyle() {
+        SearchSettings settings = BetterSearchClient.settings();
         return correctionOffered
                 && BetterSearchClient.isEnabled()
-                && BetterSearchClient.settings().fixCommandErrors
+                && (settings.fixCommandErrors || settings.fixVersionNames)
                 ? FIXABLE : STUCK;
     }
 
@@ -90,6 +92,7 @@ public final class CommandSearch {
             }
 
             boolean wantsItems = false;
+            boolean wantsBlocks = false;
             boolean wantsPlayers = false;
             for (CommandNode<SharedSuggestionProvider> child : context.parent.getChildren()) {
                 if (child instanceof ArgumentCommandNode<?, ?>) {
@@ -97,6 +100,8 @@ public final class CommandSearch {
                     ArgumentType<?> type = argument.getType();
                     if (isItemLike(type)) {
                         wantsItems = true;
+                    } else if (isBlockLike(type)) {
+                        wantsBlocks = true;
                     } else if (isPlayerLike(type)) {
                         wantsPlayers = true;
                     }
@@ -104,8 +109,10 @@ public final class CommandSearch {
             }
 
             List<String> additions = new ArrayList<>();
-            if (wantsItems && settings.searchCommandItems) {
-                List<ResourceLocation> ids = CommandItemIndex.search(word);
+            if ((wantsItems || wantsBlocks) && settings.searchCommandItems) {
+                List<ResourceLocation> ids = wantsItems
+                        ? CommandItemIndex.search(word)
+                        : CommandItemIndex.searchBlocks(word);
                 if (ids != null) {
                     for (ResourceLocation id : ids) {
                         additions.add(id.toString());
@@ -129,7 +136,8 @@ public final class CommandSearch {
             Suggestions merged = augmentCommand(parse, cursor, original);
             SearchSettings settings = BetterSearchClient.settings();
             if (merged == null || !merged.isEmpty() || parse == null
-                    || !BetterSearchClient.isEnabled() || !settings.fixCommandErrors) {
+                    || !BetterSearchClient.isEnabled()
+                    || (!settings.fixCommandErrors && !settings.fixVersionNames)) {
                 correctionOffered = false;
                 return CompletableFuture.completedFuture(merged == null ? original : merged);
             }
@@ -177,6 +185,87 @@ public final class CommandSearch {
                 });
     }
 
+    // a line rarely holds more than one renamed name, and this stops the loop from ever spinning
+    private static final int MAX_NAME_SWAPS = 4;
+
+    /**
+     * The line the player is about to send, with the names this version renamed swapped for the
+     * ones it takes. Only a whole name is swapped and only when the swap makes the line parse,
+     * so a typo still reaches the game and is refused: that guess stays a suggestion.
+     */
+    public static String rewriteOnSend(String input) {
+        try {
+            if (input == null || input.length() < 2 || input.charAt(0) != '/'
+                    || !BetterSearchClient.isEnabled()
+                    || !BetterSearchClient.settings().fixVersionNames) {
+                return input;
+            }
+            Minecraft minecraft = Minecraft.getInstance();
+            if (minecraft == null || minecraft.player == null) {
+                return input;
+            }
+            CommandDispatcher<SharedSuggestionProvider> dispatcher = minecraft.player.connection.getCommands();
+            SharedSuggestionProvider source = minecraft.player.connection.getSuggestionsProvider();
+            String line = input;
+            for (int pass = 0; pass < MAX_NAME_SWAPS; pass++) {
+                ParseResults<SharedSuggestionProvider> parse = parseLine(dispatcher, source, line);
+                if (parse.getExceptions().isEmpty() && parse.getReader().getRemaining().trim().isEmpty()) {
+                    return line;
+                }
+                String swapped = swapOneName(dispatcher, source, parse, line);
+                if (swapped == null) {
+                    return input;
+                }
+                line = swapped;
+            }
+            return input;
+        } catch (Throwable t) {
+            BetterSearch.LOGGER.debug("[{}] line sent as typed: {}", BetterSearch.MOD_NAME, t.toString());
+            return input;
+        }
+    }
+
+    private static ParseResults<SharedSuggestionProvider> parseLine(
+            CommandDispatcher<SharedSuggestionProvider> dispatcher,
+            SharedSuggestionProvider source, String line) {
+        StringReader reader = new StringReader(line);
+        if (reader.canRead() && reader.peek() == '/') {
+            reader.skip();
+        }
+        return dispatcher.parse(reader, source);
+    }
+
+    private static String swapOneName(CommandDispatcher<SharedSuggestionProvider> dispatcher,
+                                      SharedSuggestionProvider source,
+                                      ParseResults<SharedSuggestionProvider> parse, String line) {
+        int[] span = wrongWord(line, line.length(), parse);
+        if (span == null) {
+            return null;
+        }
+        StringReader reader = new StringReader(line.substring(0, span[0]));
+        if (reader.canRead() && reader.peek() == '/') {
+            reader.skip();
+        }
+        // getNow: the client tree answers without waiting, and a line is not worth a stall
+        Suggestions pool = dispatcher
+                .getCompletionSuggestions(dispatcher.parse(reader, source), span[0])
+                .getNow(null);
+        if (pool == null || pool.isEmpty()) {
+            return null;
+        }
+        List<Suggestion> options = pool.getList();
+        List<String> texts = new ArrayList<>(options.size());
+        for (Suggestion option : options) {
+            texts.add(option.getText());
+        }
+        List<String> named = CommandAliases.matches(line.substring(span[0], span[1]), texts);
+        // two answers is not a choice the mod gets to make for the player
+        if (named.size() != 1) {
+            return null;
+        }
+        return line.substring(0, span[0]) + named.get(0) + line.substring(span[1]);
+    }
+
     private static Suggestions build(String word, int start, int end,
                                      Suggestions pool, Suggestions original) {
         if (pool == null || pool.isEmpty()) {
@@ -188,7 +277,29 @@ public final class CommandSearch {
         for (Suggestion option : options) {
             texts.add(option.getText());
         }
-        List<String> chosen = CommandFuzzy.best(word, texts);
+        SearchSettings settings = BetterSearchClient.settings();
+        int limit = settings.commandSuggestionLimit;
+        List<String> chosen = new ArrayList<>();
+        if (settings.fixVersionNames) {
+            // a name this version renamed comes first: /gamemode 1 here means creative, and
+            // whoever typed zombie_pigman wants this version's zombified_piglin
+            chosen.addAll(CommandAliases.matches(word, texts));
+            for (String near : CommandAliases.starting(word, texts)) {
+                if (!chosen.contains(near)) {
+                    chosen.add(near);
+                }
+            }
+        }
+        if (settings.fixCommandErrors) {
+            for (String guess : CommandFuzzy.best(word, texts, limit)) {
+                if (!chosen.contains(guess)) {
+                    chosen.add(guess);
+                }
+            }
+        }
+        if (chosen.size() > limit) {
+            chosen = chosen.subList(0, limit);
+        }
         if (chosen.isEmpty()) {
             correctionOffered = false;
             return original;
@@ -204,15 +315,19 @@ public final class CommandSearch {
 
     private static int[] wrongWord(String input, int cursor, ParseResults<SharedSuggestionProvider> parse) {
         int at = cursor;
+        int stopped = -1;
         Map<CommandNode<SharedSuggestionProvider>, CommandSyntaxException> errors = parse.getExceptions();
         if (errors != null && !errors.isEmpty()) {
-            int deepest = -1;
             for (CommandSyntaxException error : errors.values()) {
-                deepest = Math.max(deepest, error.getCursor());
+                stopped = Math.max(stopped, error.getCursor());
             }
-            if (deepest >= 0) {
-                at = Math.min(deepest, input.length());
-            }
+        } else if (!parse.getReader().getRemaining().isEmpty()) {
+            // a literal that simply does not match throws nothing: brigadier stops the reader
+            // on that word, and the end of the line is not where that word is
+            stopped = parse.getReader().getCursor();
+        }
+        if (stopped >= 0) {
+            at = Math.min(stopped, input.length());
         }
         int start = CommandFuzzy.wordStart(input, at);
         int end = Math.max(CommandFuzzy.wordEnd(input, at), Math.min(cursor, input.length()));
@@ -221,7 +336,9 @@ public final class CommandSearch {
         }
 
         end = Math.min(end, CommandFuzzy.wordEnd(input, start));
-        if (end - start < MIN_WORD_LENGTH) {
+        // one letter is too little to guess from, and CommandFuzzy refuses it on its own;
+        // the alias table matches whole words, so /gamemode 1 has to get past here
+        if (end <= start) {
             return null;
         }
         return new int[]{start, end};
@@ -256,8 +373,11 @@ public final class CommandSearch {
 
     private static boolean isItemLike(ArgumentType<?> type) {
         return type instanceof ItemArgument
-                || type instanceof ItemPredicateArgument
-                || type instanceof BlockStateArgument
+                || type instanceof ItemPredicateArgument;
+    }
+
+    private static boolean isBlockLike(ArgumentType<?> type) {
+        return type instanceof BlockStateArgument
                 || type instanceof BlockPredicateArgument;
     }
 
@@ -319,7 +439,11 @@ public final class CommandSearch {
             seen.add(suggestion.getText());
         }
 
-        StringRange range = existing.isEmpty() ? StringRange.between(start, cursor) : original.getRange();
+        StringRange range = StringRange.between(start, cursor);
+        // ours matched input[start, cursor): a different span would replace the wrong text
+        if (!existing.isEmpty() && !range.equals(original.getRange())) {
+            return original;
+        }
         List<Suggestion> merged = new ArrayList<>(existing);
         int added = 0;
         for (String text : additions) {

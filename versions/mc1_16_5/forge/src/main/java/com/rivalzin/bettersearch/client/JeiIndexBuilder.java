@@ -73,10 +73,11 @@ public final class JeiIndexBuilder {
             if (!ns.isEmpty()) {
                 builder.modId(ns);
             }
+            builder.family(path);
             if (settings.searchItemIds) {
                 String text = ns.isEmpty() ? path.replace('_', ' ')
                         : ns + ' ' + path.replace('_', ' ');
-                builder.addNormalized(text, SearchField.SOURCE_ID);
+                builder.add(text, SearchField.SOURCE_ID);
             }
         }
     }

@@ -18,8 +18,11 @@ public final class RecipeBookSearch {
     private static volatile SearchIndex<RecipeList> index;
     private static volatile String indexLanguage = "";
     private static volatile int indexStamp = -1;
-    private static volatile int fontSize = -1;
-    private static volatile boolean building;
+    private static volatile int indexSize = -1;
+    // the client tick and the viewer thread both come through here, and a plain
+    // read-then-write let the two of them start the same work twice
+    private static final java.util.concurrent.atomic.AtomicBoolean building =
+            new java.util.concurrent.atomic.AtomicBoolean();
 
     private RecipeBookSearch() {
     }
@@ -54,50 +57,65 @@ public final class RecipeBookSearch {
         LangTable.ensure(ModConfig.settings());
         String language = Minecraft.getMinecraft().gameSettings.language;
         int stamp = LangTable.stamp() + ModConfig.stamp() * 100_000;
-        if (building || (index != null && indexLanguage.equals(language)
-                && fontSize == source.size() && indexStamp == stamp)) {
+        if (building.get() || (index != null && indexLanguage.equals(language)
+                && indexSize == source.size() && indexStamp == stamp)) {
             return;
         }
-        building = true;
+        if (!building.compareAndSet(false, true)) {
+            return;
+        }
+        boolean queued = false;
+        try {
 
-        final List<RecipeList> snapshot = new ArrayList<>(source);
-        final String buildLanguage = language;
+            final List<RecipeList> snapshot = new ArrayList<>(source);
+            final String buildLanguage = language;
+            // read once here, on the client thread: the worker must not touch the game settings
+            final SearchSettings settings = ModConfig.settings();
+            final List<String> codes = LangTable.activeCodes(settings);
 
-        Thread worker = new Thread(() -> {
-            try {
-                long started = System.nanoTime();
-                List<SearchIndex.Entry<RecipeList>> entries = new ArrayList<>(snapshot.size());
-                for (RecipeList list : snapshot) {
-                    try {
-                        EntryBuilder<RecipeList> builder = new EntryBuilder<>(list);
-                        for (IRecipe recipe : list.getRecipes()) {
-                            ItemStack out = recipe.getRecipeOutput();
-                            if (out != null && !out.isEmpty()) {
-                                CreativeIndex.fill(builder, out, ModConfig.settings(), null);
+            Thread worker = new Thread(() -> {
+                try {
+                    long started = System.nanoTime();
+                    List<SearchIndex.Entry<RecipeList>> entries = new ArrayList<>(snapshot.size());
+                    for (RecipeList list : snapshot) {
+                        try {
+                            EntryBuilder<RecipeList> builder = new EntryBuilder<>(list);
+                            for (IRecipe recipe : list.getRecipes()) {
+                                ItemStack out = recipe.getRecipeOutput();
+                                if (out != null && !out.isEmpty()) {
+                                    CreativeIndex.fill(builder, out, settings, codes, null);
+                                }
                             }
+                            if (!builder.isEmpty()) {
+                                entries.add(builder.build());
+                            }
+                        } catch (Throwable t) {
+                            BetterSearch.LOGGER.debug("[{}] recipe skipped in index: {}",
+                                    BetterSearch.MOD_NAME, t.toString());
                         }
-                        if (!builder.isEmpty()) {
-                            entries.add(builder.build());
-                        }
-                    } catch (Throwable t) {
-                        BetterSearch.LOGGER.debug("[{}] recipe skipped in index: {}",
-                                BetterSearch.MOD_NAME, t.toString());
                     }
+                    index = new SearchIndex<>(entries);
+                    indexLanguage = buildLanguage;
+                    indexStamp = stamp;
+                    indexSize = snapshot.size();
+                    BetterSearch.LOGGER.info("[{}] recipe index ready (1.12.2): {} lists in {} ms",
+                            BetterSearch.MOD_NAME, entries.size(), (System.nanoTime() - started) / 1_000_000);
+                } catch (Throwable t) {
+                    BetterSearch.LOGGER.error("[{}] failed to build recipe index",
+                            BetterSearch.MOD_NAME, t);
+                } finally {
+                    building.set(false);
                 }
-                index = new SearchIndex<>(entries);
-                indexLanguage = buildLanguage;
-                indexStamp = stamp;
-                fontSize = snapshot.size();
-                BetterSearch.LOGGER.info("[{}] recipe index ready (1.12.2): {} lists in {} ms",
-                        BetterSearch.MOD_NAME, entries.size(), (System.nanoTime() - started) / 1_000_000);
-            } catch (Throwable t) {
-                BetterSearch.LOGGER.error("[{}] failed to build recipe index",
-                        BetterSearch.MOD_NAME, t);
-            } finally {
-                building = false;
+            }, "BetterSearch-Receitas-1.12.2");
+            worker.setDaemon(true);
+            worker.start();
+            queued = true;
+        } finally {
+            // nothing was queued, so the flag has to come back down here:
+            // otherwise one throw closes this path for the rest of the session
+            if (!queued) {
+                building.set(false);
             }
-        }, "BetterSearch-Receitas-1.12.2");
-        worker.setDaemon(true);
-        worker.start();
+        }
     }
 }

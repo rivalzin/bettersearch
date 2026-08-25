@@ -75,13 +75,21 @@ public final class RecipeSearch {
             return null;
         }
 
+        // the recipe book calls this every tick while it is open, so nothing is copied
+        // until there is a reason to build
+        final long stamp = BetterSearchClient.languageStamp();
+        SearchIndex<RecipeCollection> ready = INDEX.ready(collections, collections.size(), stamp);
+        if (ready != null) {
+            return ready;
+        }
+
         final List<RecipeCollection> snapshot = List.copyOf(collections);
         final LanguageTable languages = BetterSearchClient.languages();
         final SearchSettings snapshotSettings = settings.copy();
 
         final ContextMap context = SlotDisplayContext.fromLevel(minecraft.level);
 
-        return INDEX.get(collections, collections.size(), BetterSearchClient.languageStamp(),
+        return INDEX.get(collections, collections.size(), stamp,
                 () -> build(snapshot, languages, snapshotSettings, context));
     }
 
@@ -120,11 +128,14 @@ public final class RecipeSearch {
                             }
                         }
 
-                        if (settings.searchItemIds) {
-                            Identifier id = BuiltInRegistries.ITEM.getKey(result.getItem());
-                            if (id != null) {
-                                builder.modId(id.getNamespace());
-                                builder.addNormalized(id.getNamespace() + ' ' + id.getPath().replace('_', ' '),
+                        Identifier id = BuiltInRegistries.ITEM.getKey(result.getItem());
+                        if (id != null) {
+                            // outside the if: the mod filter and the kind of item are not the id
+                            // text, and without them a recipe loses its group and its @mod
+                            builder.modId(id.getNamespace());
+                            builder.family(id.getPath());
+                            if (settings.searchItemIds) {
+                                builder.add(id.getNamespace() + ' ' + id.getPath().replace('_', ' '),
                                         SearchField.SOURCE_ID);
                             }
                         }
@@ -141,7 +152,7 @@ public final class RecipeSearch {
                         BetterSearch.MOD_NAME, t.toString());
             }
         }
-        BetterSearch.LOGGER.info("[{}] recipe index ready: {} grupos ({} sem result utilizavel)",
+        BetterSearch.LOGGER.info("[{}] recipe index ready: {} groups ({} with no usable result)",
                 BetterSearch.MOD_NAME, entries.size(), skipped);
         return new SearchIndex<>(entries);
     }

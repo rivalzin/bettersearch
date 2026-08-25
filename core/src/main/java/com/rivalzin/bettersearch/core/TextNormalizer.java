@@ -1,6 +1,6 @@
 package com.rivalzin.bettersearch.core;
 
-// strips accents so pomme finds pomme and pomme
+// strips accents, so bau finds the same thing as the accented spelling
 import java.text.Normalizer;
 import java.util.Locale;
 
@@ -20,9 +20,6 @@ public final class TextNormalizer {
             char c = lower.charAt(i);
             switch (c) {
                 case 'ß':
-                    expanded.append("ss");
-                    break;
-                case 'ẞ':
                     expanded.append("ss");
                     break;
                 case 'æ':
@@ -86,7 +83,8 @@ public final class TextNormalizer {
                     out.append(' ');
                 }
                 pendingSpace = false;
-                out.append(c);
+                // again: NFKD expands compatibility chars in UPPERCASE (\u2122 -> TM)
+                out.append(Character.toLowerCase(c));
             } else {
                 pendingSpace = true;
             }

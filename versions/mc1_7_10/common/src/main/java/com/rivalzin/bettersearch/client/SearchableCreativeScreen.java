@@ -126,7 +126,7 @@ public final class SearchableCreativeScreen extends GuiContainerCreative {
     private GuiTextField searchBox() {
         try {
             if (searchBoxField == null) {
-                // no SearchTree in 1.7.10, the creative filter is a private method on the screen
+                // the box is a private field and 1.7.10 has no accessor for it
                 searchBoxField = Reflect.field(GuiContainerCreative.class, "searchField", "field_147062_A");
             }
             return (GuiTextField) searchBoxField.get(this);

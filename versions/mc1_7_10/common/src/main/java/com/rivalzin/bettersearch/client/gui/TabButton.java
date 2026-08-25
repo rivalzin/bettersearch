@@ -6,7 +6,7 @@ import net.minecraft.client.gui.GuiButton;
 
 import java.util.function.BooleanSupplier;
 
-// active tab is drawn last so its border wins the overlap
+// flat tab with its own border: the accent line under it is what marks the active one
 public final class TabButton extends GuiButton implements Pressable {
     public static final int HEIGHT = 20;
 

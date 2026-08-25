@@ -17,7 +17,10 @@ public final class CreativeSearch {
     private static volatile SearchIndex<ItemStack> index;
     private static volatile String indexLanguage = "";
     private static volatile int indexStamp = -1;
-    private static volatile boolean building;
+    // the client tick and the viewer thread both come through here, and a plain
+    // read-then-write let the two of them start the same work twice
+    private static final java.util.concurrent.atomic.AtomicBoolean building =
+            new java.util.concurrent.atomic.AtomicBoolean();
 
     private static SearchIndex<ItemStack> cachedIndex;
     private static String cachedQuery;
@@ -59,37 +62,49 @@ public final class CreativeSearch {
         LangTable.ensure(ModConfig.settings());
         String language = Minecraft.getMinecraft().gameSettings.language;
         int stamp = LangTable.stamp() + ModConfig.stamp() * 100_000;
-        if (building || (index != null && indexLanguage.equals(language) && indexStamp == stamp)) {
+        if (building.get() || (index != null && indexLanguage.equals(language) && indexStamp == stamp)) {
             return;
         }
-        building = true;
+        if (!building.compareAndSet(false, true)) {
+            return;
+        }
+        boolean queued = false;
+        try {
 
-        final NonNullList<ItemStack> source = NonNullList.create();
-        for (Item item : Item.REGISTRY) {
-            try {
-                item.getSubItems(CreativeTabs.SEARCH, source);
-            } catch (Throwable t) {
-                BetterSearch.LOGGER.debug("[{}] skipped modded item: {}",
-                        BetterSearch.MOD_NAME, t.toString());
+            final NonNullList<ItemStack> source = NonNullList.create();
+            for (Item item : Item.REGISTRY) {
+                try {
+                    item.getSubItems(CreativeTabs.SEARCH, source);
+                } catch (Throwable t) {
+                    BetterSearch.LOGGER.debug("[{}] skipped modded item: {}",
+                            BetterSearch.MOD_NAME, t.toString());
+                }
+            }
+            final List<ItemStack> snapshot = new ArrayList<>(source);
+            final String buildLanguage = language;
+
+            Thread worker = new Thread(() -> {
+                try {
+                    SearchIndex<ItemStack> renamed = CreativeIndex.build(snapshot, ModConfig.settings());
+                    index = renamed;
+                    indexLanguage = buildLanguage;
+                    indexStamp = stamp;
+                } catch (Throwable t) {
+                    BetterSearch.LOGGER.error("[{}] failed to build creative index",
+                            BetterSearch.MOD_NAME, t);
+                } finally {
+                    building.set(false);
+                }
+            }, "BetterSearch-Indice-1.12.2");
+            worker.setDaemon(true);
+            worker.start();
+            queued = true;
+        } finally {
+            // nothing was queued, so the flag has to come back down here:
+            // otherwise one throw closes this path for the rest of the session
+            if (!queued) {
+                building.set(false);
             }
         }
-        final List<ItemStack> snapshot = new ArrayList<>(source);
-        final String buildLanguage = language;
-
-        Thread worker = new Thread(() -> {
-            try {
-                SearchIndex<ItemStack> renamed = CreativeIndex.build(snapshot, ModConfig.settings());
-                index = renamed;
-                indexLanguage = buildLanguage;
-                indexStamp = stamp;
-            } catch (Throwable t) {
-                BetterSearch.LOGGER.error("[{}] failed to build creative index",
-                        BetterSearch.MOD_NAME, t);
-            } finally {
-                building = false;
-            }
-        }, "BetterSearch-Indice-1.12.2");
-        worker.setDaemon(true);
-        worker.start();
     }
 }

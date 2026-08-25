@@ -31,9 +31,6 @@ public final class ToggleSwitch extends AbstractWidget {
         this.animationStart = 0L;
     }
 
-    public boolean value() {
-        return value;
-    }
 
     @Override
     public void onClick(MouseButtonEvent event, boolean isDoubleClick) {

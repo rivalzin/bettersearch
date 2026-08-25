@@ -32,8 +32,7 @@ public final class ModConfig {
 
     public static void apply(SearchSettings updated) {
         updated.sanitize();
-        boolean languagesChanged = !updated.languages.equals(settings.languages)
-                || updated.crossLanguage != settings.crossLanguage;
+        boolean languagesChanged = updated.affectsLanguageTable(settings);
         settings = updated;
         stamp++;
         if (languagesChanged) {

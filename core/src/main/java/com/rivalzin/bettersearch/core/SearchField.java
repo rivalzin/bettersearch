@@ -22,8 +22,6 @@ public final class SearchField {
 
     public final String compact;
 
-    public final long compactMask;
-
     public final byte source;
 
     public SearchField(String normalizedText, byte source) {
@@ -63,11 +61,9 @@ public final class SearchField {
             }
             this.initials = ini.toString();
             this.compact = flat.toString();
-            this.compactMask = TextNormalizer.charMask(this.compact);
         } else {
             this.initials = null;
             this.compact = null;
-            this.compactMask = 0L;
         }
     }
 

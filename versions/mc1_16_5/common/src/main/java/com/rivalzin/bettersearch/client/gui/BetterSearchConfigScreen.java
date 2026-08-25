@@ -152,6 +152,9 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
                 addToggle("fix_commands", () -> settings.fixCommandErrors,
                         v -> settings.fixCommandErrors = v, DEFAULTS.fixCommandErrors)
                         .preview(previewOf("fix_commands"));
+                addToggle("version_names", () -> settings.fixVersionNames,
+                        v -> settings.fixVersionNames = v, DEFAULTS.fixVersionNames)
+                        .preview(previewOf("version_names"));
                 addToggle("search_player_names", () -> settings.searchPlayerNames,
                         v -> settings.searchPlayerNames = v, DEFAULTS.searchPlayerNames)
                         .preview(previewOf("search_player_names"));
@@ -159,11 +162,11 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
                         v -> settings.searchCommandItems = v, DEFAULTS.searchCommandItems)
                         .preview(previewOf("search_command_items"));
                 addToggle("search_jei", () -> settings.searchJei,
-                        v -> settings.searchJei = v, DEFAULTS.searchJei);
-                addToggle("search_emi", () -> settings.searchEmi,
-                        v -> settings.searchEmi = v, DEFAULTS.searchEmi);
+                        v -> settings.searchJei = v, DEFAULTS.searchJei)
+                        .preview(previewOf("search_jei"));
                 addToggle("search_rei", () -> settings.searchRei,
-                        v -> settings.searchRei = v, DEFAULTS.searchRei);
+                        v -> settings.searchRei = v, DEFAULTS.searchRei)
+                        .preview(previewOf("search_rei"));
                 addSlider("command_suggestion_limit", 1, SUGGESTION_LIMIT_MAX, 1,
                         () -> settings.commandSuggestionLimit,
                         v -> settings.commandSuggestionLimit = v, DEFAULTS.commandSuggestionLimit,
@@ -239,7 +242,11 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
         target.searchPlayerNames = copy.searchPlayerNames;
         target.searchCommandItems = copy.searchCommandItems;
         target.fixCommandErrors = copy.fixCommandErrors;
+        target.fixVersionNames = copy.fixVersionNames;
         target.commandSuggestionLimit = copy.commandSuggestionLimit;
+        target.searchJei = copy.searchJei;
+        target.searchEmi = copy.searchEmi;
+        target.searchRei = copy.searchRei;
         target.typoTolerance = copy.typoTolerance;
         target.minTypoLength = copy.minTypoLength;
         target.matchInitials = copy.matchInitials;

@@ -19,9 +19,9 @@ public final class BetterSearchForge {
         ModConfig.load(new java.io.File(event.getModConfigurationDirectory(),
                 "bettersearch.json").toPath());
         if (FMLCommonHandler.instance().getSide() == Side.CLIENT) {
+            // two buses here: gui events on MinecraftForge, key and tick events on FML
             MinecraftForge.EVENT_BUS.register(new SearchHook());
             FMLCommonHandler.instance().bus().register(new Keybinds());
-
             FMLCommonHandler.instance().bus().register(new IndexWarmer());
             BetterSearch.LOGGER.info("[{}] loaded (1.7.10), log backend: {}",
                     BetterSearch.MOD_NAME, BetterSearch.LOGGER.backend());

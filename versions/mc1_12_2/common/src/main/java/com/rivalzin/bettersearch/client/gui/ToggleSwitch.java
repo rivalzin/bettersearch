@@ -26,9 +26,6 @@ public final class ToggleSwitch extends GuiButton implements Pressable {
         this.animationStart = 0L;
     }
 
-    public boolean value() {
-        return value;
-    }
 
     @Override
     public void onPress() {

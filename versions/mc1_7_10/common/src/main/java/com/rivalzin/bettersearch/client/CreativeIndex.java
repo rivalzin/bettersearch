@@ -24,11 +24,12 @@ public final class CreativeIndex {
         long started = System.nanoTime();
         List<SearchIndex.Entry<ItemStack>> entries = new ArrayList<SearchIndex.Entry<ItemStack>>(source.size());
         EntityPlayer player = Minecraft.getMinecraft().thePlayer;
+        List<String> codes = LangTable.activeCodes(settings);
 
         for (ItemStack stack : source) {
             try {
                 EntryBuilder<ItemStack> builder = new EntryBuilder<ItemStack>(stack);
-                fill(builder, stack, settings, player);
+                fill(builder, stack, settings, codes, player);
                 entries.add(builder.build());
             } catch (Throwable t) {
                 BetterSearch.LOGGER.debug("[{}] skipped item: {}",
@@ -42,8 +43,10 @@ public final class CreativeIndex {
         return index;
     }
 
-    static void fill(EntryBuilder<?> builder, ItemStack stack,
-                                  SearchSettings settings, EntityPlayer player) {
+    // the code list is the same for every item: reading it here again cost one list and
+    // a full pass over the settings per item
+    static void fill(EntryBuilder<?> builder, ItemStack stack, SearchSettings settings,
+                     List<String> codes, EntityPlayer player) {
         String id = Item.itemRegistry.getNameForObject(stack.getItem());
         String domain = null;
         String path = null;
@@ -52,13 +55,14 @@ public final class CreativeIndex {
             domain = colon > 0 ? id.substring(0, colon) : "minecraft";
             path = colon > 0 ? id.substring(colon + 1) : id;
             builder.modId(domain);
+            builder.family(path);
         }
 
         builder.add(stack.getDisplayName(), SearchField.SOURCE_NATIVE);
 
         if (settings.crossLanguage) {
             String key = stack.getUnlocalizedName() + ".name";
-            for (String code : LangTable.activeCodes(settings)) {
+            for (String code : codes) {
                 String translated = LangTable.get(code, key);
                 if (translated != null) {
                     builder.add(translated, "en_us".equalsIgnoreCase(code)
@@ -69,7 +73,7 @@ public final class CreativeIndex {
         }
 
         if (settings.searchItemIds && domain != null) {
-            builder.addNormalized(domain + ' ' + path.replace('_', ' '),
+            builder.add(domain + ' ' + path.replace('_', ' '),
                     SearchField.SOURCE_ID);
         }
 

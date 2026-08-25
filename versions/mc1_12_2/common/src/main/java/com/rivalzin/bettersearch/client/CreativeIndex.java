@@ -26,11 +26,12 @@ public final class CreativeIndex {
         long started = System.nanoTime();
         List<SearchIndex.Entry<ItemStack>> entries = new ArrayList<>(source.size());
         EntityPlayer player = Minecraft.getMinecraft().player;
+        List<String> codes = LangTable.activeCodes(settings);
 
         for (ItemStack stack : source) {
             try {
                 EntryBuilder<ItemStack> builder = new EntryBuilder<>(stack);
-                fill(builder, stack, settings, player);
+                fill(builder, stack, settings, codes, player);
                 entries.add(builder.build());
             } catch (Throwable t) {
                 BetterSearch.LOGGER.debug("[{}] skipped item: {}",
@@ -44,18 +45,21 @@ public final class CreativeIndex {
         return index;
     }
 
-    static void fill(EntryBuilder<?> builder, ItemStack stack,
-                                  SearchSettings settings, EntityPlayer player) {
+    // the code list is the same for every item: reading it here again cost one list and
+    // a full pass over the settings per item
+    static void fill(EntryBuilder<?> builder, ItemStack stack, SearchSettings settings,
+                     List<String> codes, EntityPlayer player) {
         ResourceLocation id = Item.REGISTRY.getNameForObject(stack.getItem());
         if (id != null) {
             builder.modId(id.getNamespace());
+            builder.family(id.getPath());
         }
 
         builder.add(stack.getDisplayName(), SearchField.SOURCE_NATIVE);
 
         if (settings.crossLanguage) {
             String key = stack.getTranslationKey() + ".name";
-            for (String code : LangTable.activeCodes(settings)) {
+            for (String code : codes) {
                 String translated = LangTable.get(code, key);
                 if (translated != null) {
                     builder.add(translated, "en_us".equalsIgnoreCase(code)
@@ -66,7 +70,7 @@ public final class CreativeIndex {
         }
 
         if (settings.searchItemIds && id != null) {
-            builder.addNormalized(id.getNamespace() + ' ' + id.getPath().replace('_', ' '),
+            builder.add(id.getNamespace() + ' ' + id.getPath().replace('_', ' '),
                     SearchField.SOURCE_ID);
         }
 

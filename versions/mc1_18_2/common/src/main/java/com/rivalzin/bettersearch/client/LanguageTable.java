@@ -62,13 +62,6 @@ public final class LanguageTable {
         return byLanguage.isEmpty();
     }
 
-    public int entryCount() {
-        int total = 0;
-        for (Map<String, String> map : byLanguage.values()) {
-            total += map.size();
-        }
-        return total;
-    }
 
     public static LanguageTable load(ResourceManager resourceManager, SearchSettings settings) {
         if (!settings.crossLanguage) {
@@ -79,7 +72,6 @@ public final class LanguageTable {
 
         Set<String> wanted = settings.indexesAllLanguages() ? null : new LinkedHashSet<>(settings.languages);
         if (wanted != null) {
-            wanted.remove("*");
             if (wanted.isEmpty()) {
                 return new LanguageTable(Map.of(), List.of(), request);
             }
@@ -88,7 +80,19 @@ public final class LanguageTable {
         Map<ResourceLocation, List<Resource>> available = new LinkedHashMap<>();
         try {
             for (ResourceLocation id : resourceManager.listResources("lang", name -> name.endsWith(".json"))) {
-                available.put(id, resourceManager.getResources(id));
+                String code = languageCodeOf(id.getPath());
+                // getResources opens a stream per pack, so only ask for what will be read
+                if (code == null || (wanted != null && !wanted.contains(code))) {
+                    continue;
+                }
+                // a pack can list a path it cannot hand over: KubeJS does it with its own
+                // namespace. Skipping that one file used to skip every language there is.
+                try {
+                    available.put(id, resourceManager.getResources(id));
+                } catch (Exception e) {
+                    BetterSearch.LOGGER.debug("[{}] language file skipped ({}): {}",
+                            BetterSearch.MOD_NAME, id, e.toString());
+                }
             }
         } catch (Exception e) {
             BetterSearch.LOGGER.warn("[{}] could not list language files",
@@ -99,9 +103,6 @@ public final class LanguageTable {
         Map<String, Map<String, String>> result = new LinkedHashMap<>();
         for (Map.Entry<ResourceLocation, List<Resource>> entry : available.entrySet()) {
             String code = languageCodeOf(entry.getKey().getPath());
-            if (code == null || (wanted != null && !wanted.contains(code))) {
-                continue;
-            }
             Map<String, String> translations = result.computeIfAbsent(code, unused -> new HashMap<>(2048));
             try {
                 for (Resource resource : entry.getValue()) {

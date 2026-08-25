@@ -16,6 +16,7 @@ import java.io.BufferedWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Map;
 
 public final class ConfigIo {
@@ -89,8 +90,16 @@ public final class ConfigIo {
             for (Map.Entry<String, JsonElement> entry : GSON.toJsonTree(settings).getAsJsonObject().entrySet()) {
                 out.add(entry.getKey(), entry.getValue());
             }
-            try (BufferedWriter writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
+            // write beside it and swap: newBufferedWriter truncates first
+            Path temp = file.resolveSibling(file.getFileName() + ".tmp");
+            try (BufferedWriter writer = Files.newBufferedWriter(temp, StandardCharsets.UTF_8)) {
                 writer.write(GSON.toJson(out));
+            }
+            try {
+                Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE);
+            } catch (Exception atomicNotSupported) {
+                Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (Exception e) {
             BetterSearch.LOGGER.warn("[{}] could not save config to {}",

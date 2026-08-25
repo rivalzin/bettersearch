@@ -82,6 +82,8 @@ public abstract class OptionRowsScreen extends Screen {
     private int previewTop;
     private Row hoveredRow;
 
+    private Row panelRow;
+
     protected OptionRowsScreen(Component title, Screen parent) {
         super(title);
         this.parent = parent;
@@ -119,6 +121,7 @@ public abstract class OptionRowsScreen extends Screen {
     protected void init() {
         rows.clear();
         hoveredRow = null;
+        panelRow = null;
 
         int tabs = tabsHeight();
         contentTop = MARGIN + (tabs > 0 ? tabs + 4 : 0);
@@ -128,7 +131,8 @@ public abstract class OptionRowsScreen extends Screen {
         panelX = this.width - MARGIN - panelWidth;
         listX = MARGIN;
         listWidth = panelX - MARGIN - listX;
-        barWidth = listWidth - RESET_SIZE - 4;
+        // the last pixels are the scrollbar's, not the reset arrow's
+        barWidth = listWidth - RESET_SIZE - 4 - SCROLLBAR_GUTTER;
         sliderWidth = Mth.clamp(barWidth * 45 / 100, 60, SLIDER_WIDTH_MAX);
         listBottom = contentBottom - listBottomInset();
         visibleRows = Math.max(1, (listBottom - contentTop) / ROW_HEIGHT);
@@ -184,17 +188,8 @@ public abstract class OptionRowsScreen extends Screen {
         return panelWidth;
     }
 
-    protected final int contentTop() {
-        return contentTop;
-    }
 
-    protected final int contentBottom() {
-        return contentBottom;
-    }
 
-    protected final int listBottom() {
-        return listBottom;
-    }
 
     private int controlX(int width) {
         return listX + barWidth - 6 - width;
@@ -313,6 +308,8 @@ public abstract class OptionRowsScreen extends Screen {
     private static final int SCROLLBAR_WIDTH_HELD = 4;
 
     private static final int SCROLLBAR_GRAB = 3;
+
+    private static final int SCROLLBAR_GUTTER = SCROLLBAR_WIDTH_HELD + SCROLLBAR_GRAB + 1;
 
     private boolean scrollbarHeld;
 
@@ -451,14 +448,19 @@ public abstract class OptionRowsScreen extends Screen {
 
     // hover drives the preview, so it is tracked even when nothing is clicked
     private void updateHoveredRow(int mouseX, int mouseY) {
-        if (mouseX < listX || mouseX > listX + listWidth) {
-            return;
-        }
-        for (Row row : rows) {
-            if (row.control.visible && mouseY >= row.y && mouseY < row.y + ROW_HEIGHT) {
-                hoveredRow = row;
-                return;
+        hoveredRow = null;
+        if (mouseX >= listX && mouseX <= listX + listWidth) {
+            for (Row row : rows) {
+                if (row.control.visible && mouseY >= row.y && mouseY < row.y + ROW_HEIGHT) {
+                    hoveredRow = row;
+                    break;
+                }
             }
+        }
+        if (hoveredRow != null) {
+            panelRow = hoveredRow;
+        } else if (panelRow != null && !panelRow.control.visible) {
+            panelRow = null;
         }
     }
 
@@ -495,9 +497,9 @@ public abstract class OptionRowsScreen extends Screen {
         int textWidth = panelWidth - 16;
         int y = contentTop + 8;
 
-        Component title = hoveredRow != null ? hoveredRow.title : panelDefaultTitle();
-        Component description = hoveredRow != null ? hoveredRow.description : panelDefaultDescription();
-        ResourceLocation preview = hoveredRow != null ? hoveredRow.preview : null;
+        Component title = panelRow != null ? panelRow.title : panelDefaultTitle();
+        Component description = panelRow != null ? panelRow.description : panelDefaultDescription();
+        ResourceLocation preview = panelRow != null ? panelRow.preview : null;
 
         int textLimit = panelFooterTop() - 6;
         if (preview != null) {

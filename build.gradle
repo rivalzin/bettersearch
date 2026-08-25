@@ -17,11 +17,18 @@ def coreTestDir = layout.buildDirectory.dir('coreTest')
 tasks.register('compileCoreTest', JavaCompile) {
     group = 'verification'
     description = 'Compila o nucleo de busca e o teste, sem Minecraft.'
-    source = fileTree('core/src/main/java/com/rivalzin/bettersearch/core') + fileTree('tools')
+    // So o core e o teste. O fileTree('tools') inteiro arrastava os esbocos de LWJGL e de
+    // Gson para dentro do resultado do teste, que nao tem nada a ver com eles.
+    source = fileTree('core/src/main/java/com/rivalzin/bettersearch/core') +
+             files('tools/BetterSearchCoreTest.java')
     include '**/*.java'
     classpath = files()
     destinationDirectory = coreTestDir
     options.encoding = 'UTF-8'
+    // O Gradle 9 cobra os tres. So o release nao basta: a tarefa e registrada na mao, e sem
+    // sourceCompatibility/targetCompatibility ele para antes de compilar.
+    sourceCompatibility = '21'
+    targetCompatibility = '21'
     options.release = 21
 }
 
@@ -41,21 +48,28 @@ tasks.register('coreTest', JavaExec) {
  */
 tasks.register('dist', Copy) {
     group = 'build'
-    description = 'Constroi todos os loaders e junta os jars em build/dist.'
-    // Uma linha por alvo. Ao acrescentar uma versao, some o caminho dela aqui.
-    dependsOn ':versions:mc1_21_1:neoforge:build', ':versions:mc1_21_1:fabric:build',
-              ':versions:mc1_21_9:neoforge:build', ':versions:mc1_21_9:fabric:build',
-              ':versions:mc1_21_11:neoforge:build', ':versions:mc1_21_11:fabric:build',
-              ':versions:mc26_1:neoforge:build', ':versions:mc26_1:fabric:build',
-              ':versions:mc26_2:neoforge:build', ':versions:mc26_2:fabric:build',
-              ':versions:mc1_20_1:fabric:build', ':versions:mc1_20_1:forge:build'
-    from files('versions/mc1_21_1/neoforge/build/libs', 'versions/mc1_21_1/fabric/build/libs',
-               'versions/mc1_21_9/neoforge/build/libs', 'versions/mc1_21_9/fabric/build/libs',
-               'versions/mc1_21_11/neoforge/build/libs', 'versions/mc1_21_11/fabric/build/libs',
-               'versions/mc26_1/neoforge/build/libs', 'versions/mc26_1/fabric/build/libs',
-               'versions/mc26_2/neoforge/build/libs', 'versions/mc26_2/fabric/build/libs',
-               'versions/mc1_20_1/fabric/build/libs', 'versions/mc1_20_1/forge/build/libs')
+    description = 'Constroi TODOS os loaders e junta os jars em build/dist.'
+    // Uma linha por alvo, na mesma ordem do settings.gradle. Ao acrescentar uma versao, some
+    // o caminho dela aqui - e a secao 33 do tools/verify.sh cobra que nenhuma fique de fora,
+    // que foi como 10 dos 22 alvos passaram meses sem entrar no dist. A 1.20.1 nao tem
+    // modulo neoforge de proposito: la o jar do Forge roda nos dois.
+    def alvos = [
+        'versions:mc1_7_10:forge',
+        'versions:mc1_12_2:forge',
+        'versions:mc1_16_5:forge',   'versions:mc1_16_5:fabric',
+        'versions:mc1_18_2:forge',   'versions:mc1_18_2:fabric',
+        'versions:mc1_19_2:forge',   'versions:mc1_19_2:fabric',
+        'versions:mc1_20_1:forge',   'versions:mc1_20_1:fabric',
+        'versions:mc1_21_1:neoforge','versions:mc1_21_1:fabric',
+        'versions:mc1_21_4:neoforge','versions:mc1_21_4:fabric',
+        'versions:mc1_21_9:neoforge','versions:mc1_21_9:fabric',
+        'versions:mc1_21_11:neoforge','versions:mc1_21_11:fabric',
+        'versions:mc26_1:neoforge',  'versions:mc26_1:fabric',
+        'versions:mc26_2:neoforge',  'versions:mc26_2:fabric',
+    ]
+    dependsOn alvos.collect { ':' + it + ':build' }
+    from alvos.collect { it.replace(':', '/') + '/build/libs' }
     into layout.buildDirectory.dir('dist')
     include '*.jar'
-    exclude '*-sources.jar', '*-dev.jar', '*-dev-shadow.jar'
+    exclude '*-sources.jar', '*-dev.jar', '*-dev-shadow.jar', '*-shadow.jar'
 }

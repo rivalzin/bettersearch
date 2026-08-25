@@ -7,6 +7,7 @@ import com.rivalzin.bettersearch.core.SearchIndex;
 import com.rivalzin.bettersearch.core.SearchQuery;
 import com.rivalzin.bettersearch.core.SearchSettings;
 import dev.emi.emi.api.stack.EmiIngredient;
+import dev.emi.emi.search.EmiSearch;
 import dev.emi.emi.api.stack.EmiStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
@@ -20,10 +21,21 @@ import java.util.Set;
 public final class EmiSearchBridge {
     private static final String EMI_SYNTAX = "#$/|";
 
+    private static final Object BUILD_LOCK = new Object();
+
     private static volatile SearchIndex<EmiIngredient> index;
     private static volatile int indexedSize = -1;
     // EMI caches its own list, rebuild when the settings stamp moves
     private static volatile long indexedStamp = Long.MIN_VALUE;
+
+    static {
+        BetterSearchClient.onSettingsApplied(() -> {
+            try {
+                EmiSearch.update();
+            } catch (Throwable ignored) {
+            }
+        });
+    }
 
     private EmiSearchBridge() {
     }
@@ -96,6 +108,19 @@ public final class EmiSearchBridge {
         if (current != null && indexedSize == source.size() && indexedStamp == stamp) {
             return current;
         }
+        // EMI starts a thread per keystroke and lets the old ones run on, so without this
+        // four of them would build the very same index at the same time
+        synchronized (BUILD_LOCK) {
+            current = index;
+            if (current != null && indexedSize == source.size() && indexedStamp == stamp) {
+                return current;
+            }
+            return buildIndex(source, settings, stamp);
+        }
+    }
+
+    private static SearchIndex<EmiIngredient> buildIndex(List<? extends EmiIngredient> source,
+                                                         SearchSettings settings, long stamp) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null || minecraft.player == null) {
             return null;
@@ -130,9 +155,10 @@ public final class EmiSearchBridge {
         BetterSearch.LOGGER.info("[{}] EMI index ready: {} of {} ingredients in {} ms",
                 BetterSearch.MOD_NAME, entries.size(), source.size(),
                 (System.nanoTime() - start) / 1_000_000);
-        index = built;
         indexedSize = source.size();
         indexedStamp = stamp;
+        // published last, so whoever sees this index also sees the size and stamp behind it
+        index = built;
         return built;
     }
 
@@ -148,8 +174,9 @@ public final class EmiSearchBridge {
         ResourceLocation id = first.getId();
         if (id != null) {
             builder.modId(id.getNamespace());
+            builder.family(id.getPath());
             if (settings.searchItemIds) {
-                builder.addNormalized(id.getNamespace() + ' ' + id.getPath().replace('_', ' '),
+                builder.add(id.getNamespace() + ' ' + id.getPath().replace('_', ' '),
                         SearchField.SOURCE_ID);
             }
         }

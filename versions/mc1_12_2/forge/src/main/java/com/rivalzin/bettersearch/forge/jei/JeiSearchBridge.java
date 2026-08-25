@@ -26,7 +26,13 @@ public final class JeiSearchBridge {
     private static volatile String indexLanguage = "";
     private static volatile int indexStamp = -1;
     private static volatile int indexSize = -1;
-    private static volatile boolean building;
+    // the client tick and the viewer thread both come through here, and a plain
+    // read-then-write let the two of them start the same work twice
+    private static final java.util.concurrent.atomic.AtomicBoolean building =
+            new java.util.concurrent.atomic.AtomicBoolean();
+
+    // bumped when a new index is ready, so JeiIntegration knows to poke JEI
+    private static volatile int generation;
 
     private static Field itemListField;
 
@@ -35,6 +41,10 @@ public final class JeiSearchBridge {
     private static int[] cachedResult;
 
     private JeiSearchBridge() {
+    }
+
+    static int generation() {
+        return generation;
     }
 
     static int[] search(String word, IngredientFilter filter) {
@@ -85,30 +95,43 @@ public final class JeiSearchBridge {
         String language = Minecraft.getMinecraft().gameSettings.language;
         int stamp = LangTable.stamp() + ModConfig.stamp() * 100_000;
         int size = list.size();
-        if (building || (index != null && indexLanguage.equals(language)
+        if (building.get() || (index != null && indexLanguage.equals(language)
                 && indexStamp == stamp && indexSize == size)) {
             return;
         }
-        building = true;
+        if (!building.compareAndSet(false, true)) {
+            return;
+        }
+        boolean queued = false;
+        try {
 
-        final List<Object> snapshot = new ArrayList<>(list);
-        final String buildLanguage = language;
+            final List<Object> snapshot = new ArrayList<>(list);
+            final String buildLanguage = language;
 
-        Thread worker = new Thread(() -> {
-            try {
-                index = build(snapshot, ModConfig.settings());
-                indexLanguage = buildLanguage;
-                indexStamp = stamp;
-                indexSize = snapshot.size();
-            } catch (Throwable t) {
-                BetterSearch.LOGGER.error("[{}] failed to build JEI index",
-                        BetterSearch.MOD_NAME, t);
-            } finally {
-                building = false;
+            Thread worker = new Thread(() -> {
+                try {
+                    index = build(snapshot, ModConfig.settings());
+                    indexLanguage = buildLanguage;
+                    indexStamp = stamp;
+                    indexSize = snapshot.size();
+                    generation++;
+                } catch (Throwable t) {
+                    BetterSearch.LOGGER.error("[{}] failed to build JEI index",
+                            BetterSearch.MOD_NAME, t);
+                } finally {
+                    building.set(false);
+                }
+            }, "BetterSearch-Indice-JEI-1.12.2");
+            worker.setDaemon(true);
+            worker.start();
+            queued = true;
+        } finally {
+            // nothing was queued, so the flag has to come back down here:
+            // otherwise one throw closes this path for the rest of the session
+            if (!queued) {
+                building.set(false);
             }
-        }, "BetterSearch-Indice-JEI-1.12.2");
-        worker.setDaemon(true);
-        worker.start();
+        }
     }
 
     private static SearchIndex<Integer> build(List<Object> elements, SearchSettings settings) {
@@ -153,11 +176,14 @@ public final class JeiSearchBridge {
                 }
             }
 
-            if (settings.searchItemIds) {
-                ResourceLocation id = Item.REGISTRY.getNameForObject(stack.getItem());
-                if (id != null) {
-                    builder.modId(id.getNamespace());
-                    builder.addNormalized(id.getNamespace() + ' ' + id.getPath().replace('_', ' '),
+            ResourceLocation id = Item.REGISTRY.getNameForObject(stack.getItem());
+            if (id != null) {
+                // outside the if: the mod filter and the kind of item are not the id
+                // text, and without them a recipe loses its group and its @mod
+                builder.modId(id.getNamespace());
+                builder.family(id.getPath());
+                if (settings.searchItemIds) {
+                    builder.add(id.getNamespace() + ' ' + id.getPath().replace('_', ' '),
                             SearchField.SOURCE_ID);
                 }
             }

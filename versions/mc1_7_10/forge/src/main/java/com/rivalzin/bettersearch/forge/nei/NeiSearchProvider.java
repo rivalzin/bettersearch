@@ -12,7 +12,7 @@ public final class NeiSearchProvider implements SearchTokenParser.ISearchParserP
 
     @Override
     public char getPrefix() {
-        // a prefix nobody types, so this parser runs on every search
+        // a prefix nobody can type: what makes this run on every search is the mode below
         return '\u0001';
     }
 

@@ -12,6 +12,14 @@ public final class CommandFuzzy {
 
     private static final int SCORE_FLOOR = 380;
 
+    // percent of the name the typed letters have to cover to count as a subsequence
+    private static final int SUBSEQUENCE_FLOOR = 40;
+
+    // the nearest name is only a guess worth making when the list is a menu the player
+    // could have named. Pick the nearest of ten thousand item ids and something always
+    // looks close, so /give banana would answer with an item.
+    private static final int CLOSEST_MAX_OPTIONS = 200;
+
     private static final int NO_MATCH = Integer.MIN_VALUE;
 
     private static final int MIN_WORD = 2;
@@ -59,6 +67,9 @@ public final class CommandFuzzy {
         }
 
         if (hits.isEmpty()) {
+            if (candidates.size() > CLOSEST_MAX_OPTIONS) {
+                return out;
+            }
             String closest = closest(query, candidates);
             if (closest != null) {
                 out.add(closest);
@@ -201,13 +212,19 @@ public final class CommandFuzzy {
         // suggestion lists are short, so a wrong guess is worse than none
         int max = maxEdits(query.length(), target.length());
         int distance = distance(query, target, max);
-        if (distance >= 0) {
-            return 680 - distance * 70;
+        // 5 edits score 330, under SCORE_FLOOR, so it could only hide the right candidate
+        int byDistance = distance >= 0 ? 680 - distance * 70 : NO_MATCH;
+        // the letters in order are not enough on their own: in a list of thousands of names
+        // almost any short word hides inside some long one. Asking for two fifths of the
+        // name is wide enough for swrd -> diamond_sword and closes the nonsense.
+        int bySubsequence = query.length() >= 4 && isSubsequence(query, target)
+                && query.length() * 100 >= target.length() * SUBSEQUENCE_FLOOR
+                ? 430 - Math.min(100, target.length() - query.length())
+                : NO_MATCH;
+        if (byDistance == NO_MATCH) {
+            return bySubsequence;
         }
-        if (query.length() >= 4 && isSubsequence(query, target)) {
-            return 430 - Math.min(100, target.length() - query.length());
-        }
-        return NO_MATCH;
+        return bySubsequence == NO_MATCH ? byDistance : Math.max(byDistance, bySubsequence);
     }
 
     static int maxEdits(int queryLength, int targetLength) {
@@ -216,7 +233,7 @@ public final class CommandFuzzy {
         return Math.max(1, Math.min(allowed, n / 2));
     }
 
-    // two rolling rows, no full matrix - this runs per suggestion per keystroke
+    // three rolling rows, no full matrix - this runs per suggestion per keystroke
     static int distance(String a, String b, int max) {
         int la = a.length();
         int lb = b.length();
@@ -294,6 +311,11 @@ public final class CommandFuzzy {
     }
 
     static String fold(String input) {
+        // command names are ascii nine times out of ten, and there NFKD changes nothing and
+        // there is no mark to drop, so an already lowercase name comes back without a copy
+        if (isAscii(input)) {
+            return input.toLowerCase(Locale.ROOT);
+        }
         String decomposed = Normalizer.normalize(input.toLowerCase(Locale.ROOT), Normalizer.Form.NFKD);
         StringBuilder out = new StringBuilder(decomposed.length());
         for (int i = 0; i < decomposed.length(); i++) {
@@ -306,6 +328,14 @@ public final class CommandFuzzy {
     }
 
     static String letters(String folded) {
+        int first = 0;
+        while (first < folded.length() && Character.isLetterOrDigit(folded.charAt(first))) {
+            first++;
+        }
+        // nothing to strip: hand back the same string instead of copying it
+        if (first == folded.length()) {
+            return folded;
+        }
         StringBuilder out = new StringBuilder(folded.length());
         for (int i = 0; i < folded.length(); i++) {
             char c = folded.charAt(i);
@@ -314,6 +344,15 @@ public final class CommandFuzzy {
             }
         }
         return out.toString();
+    }
+
+    private static boolean isAscii(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) > 127) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean hasLetter(String text) {

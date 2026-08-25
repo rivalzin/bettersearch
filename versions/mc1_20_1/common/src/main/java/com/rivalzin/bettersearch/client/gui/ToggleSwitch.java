@@ -30,9 +30,6 @@ public final class ToggleSwitch extends AbstractWidget {
         this.animationStart = 0L;
     }
 
-    public boolean value() {
-        return value;
-    }
 
     @Override
     @SuppressWarnings("deprecation")

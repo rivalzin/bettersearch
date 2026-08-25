@@ -26,6 +26,7 @@ public abstract class EntryListSearchManagerMixin {
         if (ordered == null || searchManager == null) {
             return;
         }
+        ReiSearch.rememberManager(searchManager);
         List<HashedEntryStackWrapper> ours = ReiSearch.reorder(
                 searchManager.filter, ordered, HashedEntryStackWrapper::unwrap);
         if (ours != null) {

@@ -7,6 +7,7 @@ import com.rivalzin.bettersearch.core.SearchIndex;
 import com.rivalzin.bettersearch.core.SearchQuery;
 import com.rivalzin.bettersearch.core.SearchSettings;
 import dev.emi.emi.api.stack.EmiIngredient;
+import dev.emi.emi.search.EmiSearch;
 import dev.emi.emi.api.stack.EmiStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
@@ -24,6 +25,15 @@ public final class EmiSearchBridge {
     private static volatile int indexedSize = -1;
     // EMI caches its own list, rebuild when the settings stamp moves
     private static volatile long indexedStamp = Long.MIN_VALUE;
+
+    static {
+        BetterSearchClient.onSettingsApplied(() -> {
+            try {
+                EmiSearch.update();
+            } catch (Throwable ignored) {
+            }
+        });
+    }
 
     private EmiSearchBridge() {
     }
@@ -148,8 +158,9 @@ public final class EmiSearchBridge {
         ResourceLocation id = first.getId();
         if (id != null) {
             builder.modId(id.getNamespace());
+            builder.family(id.getPath());
             if (settings.searchItemIds) {
-                builder.addNormalized(id.getNamespace() + ' ' + id.getPath().replace('_', ' '),
+                builder.add(id.getNamespace() + ' ' + id.getPath().replace('_', ' '),
                         SearchField.SOURCE_ID);
             }
         }

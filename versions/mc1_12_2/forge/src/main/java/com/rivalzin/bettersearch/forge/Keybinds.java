@@ -16,7 +16,6 @@ public final class Keybinds {
             "key.categories.bettersearch");
 
     public Keybinds() {
-        // two buses here: gui events on MinecraftForge, ticks on FMLCommonHandler
         ClientRegistry.registerKeyBinding(openKey);
     }
 

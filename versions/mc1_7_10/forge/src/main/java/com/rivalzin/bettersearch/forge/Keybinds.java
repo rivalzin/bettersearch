@@ -13,7 +13,6 @@ public final class Keybinds {
             Keyboard.KEY_O, "key.categories.bettersearch");
 
     public Keybinds() {
-        // two buses here: gui events on MinecraftForge, ticks on FMLCommonHandler
         ClientRegistry.registerKeyBinding(openKey);
     }
 

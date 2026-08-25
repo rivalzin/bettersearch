@@ -91,6 +91,8 @@ public final class AsyncIndex<T> {
 
     // drops the index, the next search rebuilds it
     public void invalidate() {
+        // failed too, or one build failure keeps the index off all session
+        failed = false;
         index = null;
         readySource = null;
         readySize = -1;

@@ -1,7 +1,8 @@
 package com.rivalzin.bettersearch.core;
 
 public final class FuzzyMatcher {
-    // higher tier wins first, score only breaks ties inside a tier
+    // the tier is the biggest part of the score, not a first sort key: SearchIndex adds
+    // where the text came from on top, so a name can still beat a tooltip one tier above
     public static final int TIER_EXACT = 100;
 
     public static final int TIER_PREFIX = 90;
@@ -29,7 +30,7 @@ public final class FuzzyMatcher {
 
         public int distance;
 
-        // two rows reused across items, the matrix is never allocated
+        // three rolling rows are enough for Damerau, and they are reused across items
         int[] rowA = new int[64];
         int[] rowB = new int[64];
         int[] rowC = new int[64];
@@ -95,19 +96,20 @@ public final class FuzzyMatcher {
                 return bestWordTier;
             }
 
-            String compact = field.compact;
-            if (policy.allowCompact() && compact != null && compact.length() >= tokenLength) {
-                int idx = compact.indexOf(token);
-                if (idx >= 0) {
-                    scratch.position = idx;
-                    return TIER_COMPACT;
-                }
-            }
-
             int idx = text.indexOf(token);
             if (idx >= 0) {
                 scratch.position = idx;
                 return TIER_SUBSTRING;
+            }
+
+            // compact comes after: with the spaces already matching, it was not the reason
+            String compact = field.compact;
+            if (policy.allowCompact() && compact != null && compact.length() >= tokenLength) {
+                int at = compact.indexOf(token);
+                if (at >= 0) {
+                    scratch.position = textPositionOf(text, at);
+                    return TIER_COMPACT;
+                }
             }
 
             String initials = field.initials;
@@ -158,6 +160,21 @@ public final class FuzzyMatcher {
         return NO_MATCH;
     }
 
+    // compact drops the spaces, so its indexes are not the text's
+    private static int textPositionOf(String text, int compactIndex) {
+        int seen = 0;
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) == ' ') {
+                continue;
+            }
+            if (seen == compactIndex) {
+                return i;
+            }
+            seen++;
+        }
+        return text.length();
+    }
+
     static boolean matchesInitials(String initials, String token) {
         if (initials.isEmpty() || initials.charAt(0) != token.charAt(0)) {
             return false;
@@ -173,10 +190,6 @@ public final class FuzzyMatcher {
 
     public static int prefixDistance(String token, String target, int from, int to, int max, Scratch scratch) {
         final int n = token.length();
-        if (max < 0) {
-            return 1;
-        }
-
         int limit = Math.min(to, from + n + max);
         scratch.ensure(n + 1);
 
@@ -221,7 +234,7 @@ public final class FuzzyMatcher {
                 best = cur[n];
             }
             if (rowMin > max) {
-                return max + 1;
+                return Math.min(best, max + 1);
             }
             int[] tmp = prev2;
             prev2 = prev;

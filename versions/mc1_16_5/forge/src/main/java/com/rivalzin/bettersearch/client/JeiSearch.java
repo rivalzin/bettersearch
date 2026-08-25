@@ -22,6 +22,18 @@ public final class JeiSearch {
 
     private static WeakReference<IngredientFilter> filterRef = new WeakReference<>(null);
 
+    static {
+        BetterSearchClient.onSettingsApplied(() -> {
+            try {
+                IngredientFilter filter = filterRef.get();
+                if (filter != null) {
+                    filter.invalidateCache();
+                }
+            } catch (Throwable ignored) {
+            }
+        });
+    }
+
     private JeiSearch() {
     }
 

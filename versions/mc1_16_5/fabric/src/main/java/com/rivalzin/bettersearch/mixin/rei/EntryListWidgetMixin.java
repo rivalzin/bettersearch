@@ -21,6 +21,7 @@ public abstract class EntryListWidgetMixin {
             require = 0)
     private void bettersearch$capture(EntryListWidget self, List<EntryStack> fromRei,
                                       String query, boolean skipLast) {
+        ReiSearchBridge.remember(self, query);
         List<EntryStack> source = EntryRegistry.getInstance().getPreFilteredList();
         List<EntryStack> ours = ReiSearchBridge.search(query, fromRei, source);
         ((EntryListWidgetAccessor) self).bettersearch$setAllStacks(ours == null ? fromRei : ours);

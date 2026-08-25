@@ -1,6 +1,6 @@
 package com.rivalzin.bettersearch.client.gui;
 
-// colors live here so the 1.7.10 gui can reuse them without GuiGraphics
+// one place for the colors, so every widget on the screen agrees on them
 public final class Theme {
     public static final int ACCENT = 0xFF6FD9E8;
 

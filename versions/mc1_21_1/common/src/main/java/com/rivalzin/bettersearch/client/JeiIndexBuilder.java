@@ -77,8 +77,9 @@ public final class JeiIndexBuilder {
         ResourceLocation id = helper.getResourceLocation(ingredient);
         if (id != null) {
             builder.modId(id.getNamespace());
+            builder.family(id.getPath());
             if (settings.searchItemIds) {
-                builder.addNormalized(id.getNamespace() + ' ' + id.getPath().replace('_', ' '),
+                builder.add(id.getNamespace() + ' ' + id.getPath().replace('_', ' '),
                         SearchField.SOURCE_ID);
             }
         }

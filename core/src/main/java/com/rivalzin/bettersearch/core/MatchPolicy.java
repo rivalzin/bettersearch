@@ -1,6 +1,6 @@
 package com.rivalzin.bettersearch.core;
 
-// one object per pass so the settings are read once, not per item
+// one object per pass: what a pass is allowed to do is decided before it starts
 public final class MatchPolicy {
     private final boolean allowTypos;
     private final boolean allowInitials;

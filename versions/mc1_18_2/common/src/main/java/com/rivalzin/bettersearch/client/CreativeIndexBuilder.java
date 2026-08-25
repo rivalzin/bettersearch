@@ -81,6 +81,7 @@ public final class CreativeIndexBuilder {
                             boolean englishSearched) {
         ResourceLocation id = Registry.ITEM.getKey(stack.getItem());
         builder.modId(id.getNamespace());
+        builder.family(id.getPath());
 
         builder.add(stack.getHoverName().getString(), SearchField.SOURCE_NATIVE);
 
@@ -97,7 +98,7 @@ public final class CreativeIndexBuilder {
         }
 
         if (settings.searchItemIds) {
-            builder.addNormalized(id.getNamespace() + ' ' + id.getPath().replace('_', ' '),
+            builder.add(id.getNamespace() + ' ' + id.getPath().replace('_', ' '),
                     SearchField.SOURCE_ID);
         }
 
