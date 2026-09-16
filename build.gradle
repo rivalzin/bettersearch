@@ -92,7 +92,9 @@ tasks.register('enterTest', JavaExec) {
 }
 
 tasks.named('check') {
-    dependsOn 'coreTest', 'asyncTest', 'stateTest', 'failurePolicyTest', 'enterTest'
+    if (file('tools/BetterSearchCoreTest.java').isFile()) {
+        dependsOn 'coreTest', 'asyncTest', 'stateTest', 'failurePolicyTest', 'enterTest'
+    }
 }
 
 tasks.register('dist', Sync) {

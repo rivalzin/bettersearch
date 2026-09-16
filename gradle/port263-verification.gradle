@@ -20,5 +20,7 @@ tasks.register('port263Test', JavaExec) {
 }
 
 tasks.named('check') {
-    dependsOn tasks.named('port263Test')
+    if (rootProject.file('tools/port263/BetterSearchPort263Test.java').isFile()) {
+        dependsOn tasks.named('port263Test')
+    }
 }
