@@ -1,27 +1,30 @@
 package com.rivalzin.bettersearch.mixin;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import net.minecraft.client.KeyMapping;
+import com.rivalzin.bettersearch.client.BetterSearchClient;
+import com.rivalzin.bettersearch.client.ShortcutWatcher;
+import net.minecraft.client.KeyboardHandler;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.input.KeyEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import org.spongepowered.asm.mixin.injection.Redirect;
 
-@Mixin(Minecraft.class)
+@Mixin(KeyboardHandler.class)
 public abstract class MinecraftFriendsKeyMixin {
-    @Inject(method = "handleGlobalKeyPress", at = @At("HEAD"), cancellable = true, require = 0)
-    private void bettersearch$altWinsOverGlobalKeys(InputConstants.Key key,
-                                                    boolean controlDown,
-                                                    CallbackInfoReturnable<Boolean> cir) {
-        Minecraft minecraft = (Minecraft) (Object) this;
-        if (!minecraft.hasAltDown()) {
-            return;
+    @Redirect(method = "keyPress", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/Minecraft;handleGlobalKeyPress(Lcom/mojang/blaze3d/platform/InputConstants$Key;Z)Z"),
+            require = 1)
+    private boolean bettersearch$altWinsOverGlobalKeys(Minecraft minecraft, InputConstants.Key key,
+                                                       boolean controlDown, long window, int action,
+                                                       KeyEvent event) {
+        if (ShortcutWatcher.claims(event)) {
+            if (minecraft.gui.screen() == null) {
+                BetterSearchClient.openConfigScreen();
+                return true;
+            }
+            return false;
         }
-
-        KeyMapping openConfig = KeyMapping.get("key.bettersearch.open_config");
-        if (openConfig != null && openConfig.matches(key)) {
-            cir.setReturnValue(false);
-        }
+        return minecraft.handleGlobalKeyPress(key, controlDown);
     }
 }

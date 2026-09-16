@@ -33,6 +33,7 @@ public final class BetterSearchFabricKeys {
     public static void register() {
         KeyMappingHelper.registerKeyMapping(OPEN_CONFIG);
         ShortcutWatcher.listen(BetterSearchFabricKeys::onKeyPress);
+        ShortcutWatcher.prioritize(event -> needsAlt() && OPEN_CONFIG.matches(event));
         KeyConflictGuard.listenAlt(() -> Minecraft.getInstance().hasAltDown());
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             KeyConflictGuard.update(OPEN_CONFIG, needsAlt());
