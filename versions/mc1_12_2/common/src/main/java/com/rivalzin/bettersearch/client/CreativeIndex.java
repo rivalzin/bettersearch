@@ -1,12 +1,11 @@
 package com.rivalzin.bettersearch.client;
 
 import com.rivalzin.bettersearch.BetterSearch;
-import com.rivalzin.bettersearch.core.EntryBuilder;
+import com.rivalzin.bettersearch.async.EntrySnapshot;
 import com.rivalzin.bettersearch.core.SearchField;
 import com.rivalzin.bettersearch.core.SearchIndex;
 import com.rivalzin.bettersearch.core.SearchSettings;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -14,48 +13,49 @@ import net.minecraft.util.ResourceLocation;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 
 public final class CreativeIndex {
-    // some tooltips are enormous, cap what goes into the index
     private static final int MAX_TOOLTIP_LINES = 6;
 
     private CreativeIndex() {
     }
 
-    public static SearchIndex<ItemStack> build(List<ItemStack> source, SearchSettings settings) {
-        long started = System.nanoTime();
-        List<SearchIndex.Entry<ItemStack>> entries = new ArrayList<>(source.size());
+    public static Supplier<SearchIndex<ItemStack>> prepare(List<ItemStack> source, SearchSettings settings) {
         EntityPlayer player = Minecraft.getMinecraft().player;
         List<String> codes = LangTable.activeCodes(settings);
-
-        for (ItemStack stack : source) {
+        return EntrySnapshot.capture(source, stack -> {
             try {
-                EntryBuilder<ItemStack> builder = new EntryBuilder<>(stack);
-                fill(builder, stack, settings, codes, player);
-                entries.add(builder.build());
-            } catch (Throwable t) {
-                BetterSearch.LOGGER.debug("[{}] skipped item: {}",
-                        BetterSearch.MOD_NAME, t.toString());
+                List<String> tooltip = null;
+                if (settings.searchTooltips && player != null) {
+                    tooltip = new ArrayList<>();
+                    for (Object line : stack.getTooltip(player, net.minecraft.client.util.ITooltipFlag.TooltipFlags.NORMAL)) {
+                        tooltip.add(String.valueOf(line));
+                    }
+                }
+                EntrySnapshot<ItemStack> entry = new EntrySnapshot<>(stack);
+                fill(entry, stack, settings, codes, stack.getDisplayName(), tooltip);
+                return entry;
+            } catch (RuntimeException | LinkageError error) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(error);
+                BetterSearch.LOGGER.debug("[{}] skipped item while capturing: {}",
+                        BetterSearch.MOD_NAME, error.toString());
+                return null;
             }
-        }
-
-        SearchIndex<ItemStack> index = new SearchIndex<>(entries);
-        BetterSearch.LOGGER.info("[{}] creative index ready (1.12.2): {} items in {} ms",
-                BetterSearch.MOD_NAME, entries.size(), (System.nanoTime() - started) / 1_000_000);
-        return index;
+        });
     }
 
-    // the code list is the same for every item: reading it here again cost one list and
-    // a full pass over the settings per item
-    static void fill(EntryBuilder<?> builder, ItemStack stack, SearchSettings settings,
-                     List<String> codes, EntityPlayer player) {
+    static void fill(EntrySnapshot<?> builder, ItemStack stack, SearchSettings settings,
+                     List<String> codes, String displayName, List<String> tooltip) {
         ResourceLocation id = Item.REGISTRY.getNameForObject(stack.getItem());
         if (id != null) {
             builder.modId(id.getNamespace());
             builder.family(id.getPath());
         }
 
-        builder.add(stack.getDisplayName(), SearchField.SOURCE_NATIVE);
+        if (displayName != null) {
+            builder.add(displayName, SearchField.SOURCE_NATIVE);
+        }
 
         if (settings.crossLanguage) {
             String key = stack.getTranslationKey() + ".name";
@@ -74,11 +74,10 @@ public final class CreativeIndex {
                     SearchField.SOURCE_ID);
         }
 
-        if (settings.searchTooltips && player != null && stack.hasTagCompound()) {
-            List<String> lines = stack.getTooltip(player, ITooltipFlag.TooltipFlags.NORMAL);
-            int limit = Math.min(lines.size(), MAX_TOOLTIP_LINES + 1);
+        if (tooltip != null) {
+            int limit = Math.min(tooltip.size(), MAX_TOOLTIP_LINES + 1);
             for (int i = 1; i < limit; i++) {
-                builder.add(lines.get(i), SearchField.SOURCE_TOOLTIP);
+                builder.add(tooltip.get(i), SearchField.SOURCE_TOOLTIP);
             }
         }
     }

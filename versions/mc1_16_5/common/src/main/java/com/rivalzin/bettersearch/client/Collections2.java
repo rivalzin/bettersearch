@@ -13,15 +13,12 @@ final class Collections2 {
     private Collections2() {
     }
 
-    @SafeVarargs
     static <T> List<T> list(T... items) {
         return items.length == 0
                 ? Collections.<T>emptyList()
                 : Collections.unmodifiableList(Arrays.asList(items));
     }
 
-    @SafeVarargs
-    // java 8 target: no Set.of / Map.of here
     static <T> Set<T> setOf(T... items) {
         if (items.length == 0) {
             return Collections.emptySet();
@@ -37,7 +34,6 @@ final class Collections2 {
         return new AbstractMap.SimpleImmutableEntry<K, V>(key, value);
     }
 
-    @SafeVarargs
     static <K, V> Map<K, V> map(Map.Entry<K, V>... pairs) {
         Map<K, V> out = new LinkedHashMap<K, V>();
         for (Map.Entry<K, V> pair : pairs) {

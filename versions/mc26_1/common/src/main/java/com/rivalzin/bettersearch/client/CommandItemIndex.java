@@ -1,7 +1,9 @@
 package com.rivalzin.bettersearch.client;
 
 import com.rivalzin.bettersearch.BetterSearch;
-import com.rivalzin.bettersearch.core.EntryBuilder;
+import com.rivalzin.bettersearch.async.AsyncIndexState;
+import com.rivalzin.bettersearch.async.EntrySnapshot;
+import com.rivalzin.bettersearch.async.StagedSupplier;
 import com.rivalzin.bettersearch.core.SearchField;
 import com.rivalzin.bettersearch.core.SearchIndex;
 import com.rivalzin.bettersearch.core.SearchQuery;
@@ -17,13 +19,14 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import net.minecraft.util.Util;
+import net.minecraft.client.Minecraft;
 
-// ids only, tooltips are useless in a command suggestion
 public final class CommandItemIndex {
-    private static final AsyncIndex<Identifier> INDEX = new AsyncIndex<>("item ids");
-
-    // /setblock wants a block, and this index is the item list
-    private static volatile Set<Identifier> blockIds = Collections.emptySet();
+    private static final AsyncIndexState<CommandIndex> INDEX = new AsyncIndexState<>(
+            task -> Minecraft.getInstance().execute(task), task -> Util.backgroundExecutor().execute(task),
+            task -> Minecraft.getInstance().execute(task),
+            error -> BetterSearch.LOGGER.error("[{}] item index failed", BetterSearch.MOD_NAME, error));
 
     private CommandItemIndex() {
     }
@@ -33,37 +36,26 @@ public final class CommandItemIndex {
     }
 
     public static List<Identifier> search(String rawQuery) {
-        return search(rawQuery, BetterSearchClient.settings().searchCommandItems);
+        return search(rawQuery, BetterSearchClient.settings().searchCommandItems, false);
     }
 
     public static List<Identifier> searchBlocks(String rawQuery) {
-        List<Identifier> all = search(rawQuery);
-        if (all == null) {
-            return null;
-        }
-        Set<Identifier> blocks = blockIds;
-        List<Identifier> out = new ArrayList<>(all.size());
-        for (Identifier id : all) {
-            if (blocks.contains(id)) {
-                out.add(id);
-            }
-        }
-        return out;
+        return search(rawQuery, BetterSearchClient.settings().searchCommandItems, true);
     }
 
     public static List<Identifier> search(String rawQuery, boolean allowed) {
+        return search(rawQuery, allowed, false);
+    }
+
+    private static List<Identifier> search(String rawQuery, boolean allowed, boolean blocksOnly) {
         SearchSettings settings = BetterSearchClient.settings();
         if (!BetterSearchClient.isEnabled() || !allowed) {
             return null;
         }
-
-        final LanguageTable languages = BetterSearchClient.languages();
-        final SearchSettings snapshot = settings.copy();
         int size = BuiltInRegistries.ITEM.size();
-
-        SearchIndex<Identifier> index = INDEX.get(BuiltInRegistries.ITEM, size,
-                BetterSearchClient.languageStamp(), () -> build(languages, snapshot));
-        if (index == null) {
+        CommandIndex current = INDEX.getPrepared(BuiltInRegistries.ITEM, size, BetterSearchClient.languageStamp(),
+                () -> prepare(BetterSearchClient.languages(), settings.copy()), null);
+        if (current == null) {
             return null;
         }
         try {
@@ -71,30 +63,38 @@ public final class CommandItemIndex {
             if (query.isEmpty()) {
                 return null;
             }
-            return index.search(query, settings);
-        } catch (Throwable t) {
-            BetterSearch.LOGGER.error("[{}] item id search failed", BetterSearch.MOD_NAME, t);
+            List<Identifier> results = current.index.search(query, settings);
+            if (!blocksOnly) {
+                return results;
+            }
+            List<Identifier> blocks = new ArrayList<>(results.size());
+            for (Identifier id : results) {
+                if (current.blockIds.contains(id)) {
+                    blocks.add(id);
+                }
+            }
+            return blocks;
+        } catch (RuntimeException | LinkageError error) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(error);
+            BetterSearch.LOGGER.error("[{}] item id search failed", BetterSearch.MOD_NAME, error);
             return null;
         }
     }
 
-    private static SearchIndex<Identifier> build(LanguageTable languages, SearchSettings settings) {
-        List<String> codes = new ArrayList<>();
-        for (String code : languages.languageCodes()) {
-            if (settings.indexesLanguage(code)) {
-                codes.add(code);
-            }
-        }
-
-        List<SearchIndex.Entry<Identifier>> entries = new ArrayList<>(BuiltInRegistries.ITEM.size());
-        Set<Identifier> blocks = new HashSet<>();
+    private static StagedSupplier<CommandIndex> prepare(LanguageTable languages, SearchSettings settings) {
+        List<String> codes = CreativeIndexBuilder.activeCodes(languages, settings);
+        List<Item> items = new ArrayList<>();
         for (Item item : BuiltInRegistries.ITEM) {
+            items.add(item);
+        }
+        Set<Identifier> blocks = new HashSet<>();
+        StagedSupplier<SearchIndex<Identifier>> captured = EntrySnapshot.capture(items, item -> {
             try {
                 Identifier id = BuiltInRegistries.ITEM.getKey(item);
                 if (id == null) {
-                    continue;
+                    return null;
                 }
-                EntryBuilder<Identifier> builder = new EntryBuilder<>(id);
+                EntrySnapshot<Identifier> builder = new EntrySnapshot<>(id);
                 builder.modId(id.getNamespace());
                 builder.family(id.getPath());
 
@@ -110,20 +110,37 @@ public final class CommandItemIndex {
                 }
                 builder.add(id.getNamespace() + ' ' + id.getPath().replace('_', ' '),
                         SearchField.SOURCE_ID);
-                entries.add(builder.build());
                 if (item instanceof BlockItem) {
                     blocks.add(id);
                 }
-            } catch (Throwable t) {
+                return builder;
+            } catch (RuntimeException | LinkageError t) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
                 BetterSearch.LOGGER.debug("[{}] skipped item in command index: {}",
                         BetterSearch.MOD_NAME, t.toString());
             }
+            return null;
+        }, false);
+        return new StagedSupplier<CommandIndex>() {
+            @Override
+            public boolean advance() {
+                return captured.advance();
+            }
+
+            @Override
+            public CommandIndex get() {
+                return new CommandIndex(captured.get(), Collections.unmodifiableSet(blocks));
+            }
+        };
+    }
+
+    private static final class CommandIndex {
+        final SearchIndex<Identifier> index;
+        final Set<Identifier> blockIds;
+
+        CommandIndex(SearchIndex<Identifier> index, Set<Identifier> blockIds) {
+            this.index = index;
+            this.blockIds = blockIds;
         }
-        blockIds = blocks;
-        BetterSearch.LOGGER.info("[{}] item id index ready: {} entries",
-                BetterSearch.MOD_NAME, entries.size());
-        // false: the suggestion box stops at twelve lines, and grouping there only
-        // pushes the name being typed past the end of it
-        return new SearchIndex<>(entries, false);
     }
 }

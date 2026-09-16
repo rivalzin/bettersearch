@@ -3,6 +3,7 @@ package com.rivalzin.bettersearch.neoforge;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.rivalzin.bettersearch.client.BetterSearchClient;
 import com.rivalzin.bettersearch.client.KeyConflictGuard;
+import com.rivalzin.bettersearch.client.ShortcutWatcher;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.screens.Screen;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
@@ -22,21 +23,37 @@ public final class BetterSearchKeys {
             GLFW.GLFW_KEY_O,
             CATEGORY);
 
+    private static boolean pending;
+
     private BetterSearchKeys() {
     }
 
     static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
         event.register(OPEN_CONFIG);
+        KeyConflictGuard.listenAlt(() -> Screen.hasAltDown());
+
+        KeyConflictGuard.holdOnly(mapping -> mapping.getKeyModifier() == KeyModifier.NONE);
+
+        ShortcutWatcher.listen(BetterSearchKeys::onKeyPress);
     }
 
     static void onClientTick(ClientTickEvent.Post event) {
-        // a control on the same key stands down while Alt is held; drop the Alt
-        // from the shortcut and nothing is held back
-        KeyConflictGuard.update(OPEN_CONFIG, OPEN_CONFIG.getKeyModifier() == KeyModifier.ALT,
-                Screen.hasAltDown());
+
+        KeyConflictGuard.update(OPEN_CONFIG, OPEN_CONFIG.getKeyModifier() == KeyModifier.ALT);
 
         while (OPEN_CONFIG.consumeClick()) {
+            pending = true;
+        }
+        if (pending) {
+            pending = false;
             BetterSearchClient.openConfigScreen();
+        }
+    }
+
+    private static void onKeyPress(String keyName) {
+        if (!OPEN_CONFIG.isUnbound() && OPEN_CONFIG.getKeyModifier() == KeyModifier.ALT
+                && keyName.equals(OPEN_CONFIG.saveString()) && Screen.hasAltDown()) {
+            pending = true;
         }
     }
 }

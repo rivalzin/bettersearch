@@ -22,7 +22,6 @@ public final class EasterEggs {
             Map.entry("minecraft:brush", List.of("spacey", "spaceybubs", "xspaceybubs")),
             Map.entry("minecraft:yellow_dye", List.of("spacey", "spaceybubs", "xspaceybubs")));
 
-    // these only fire when english is being searched, otherwise they collide
     private static final Map<String, List<String>> ENGLISH = Map.of(
 
             "minecraft:crafting_table", List.of("workbench"));

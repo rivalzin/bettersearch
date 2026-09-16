@@ -25,9 +25,27 @@ public final class SearchableCreativeScreen extends GuiContainerCreative {
     private static boolean failed;
 
     private boolean clearOnNextKey;
+    private int seenGeneration;
 
     public SearchableCreativeScreen(EntityPlayer player) {
         super(player);
+        this.seenGeneration = CreativeSearch.generation();
+    }
+
+    @Override
+    public void updateScreen() {
+        super.updateScreen();
+
+        int now = CreativeSearch.generation();
+        if (this.seenGeneration != now) {
+            this.seenGeneration = now;
+            if (!failed && currentTab() == CreativeTabs.tabAllSearch) {
+                GuiTextField box = searchBox();
+                if (box != null && !box.getText().isEmpty()) {
+                    search(box.getText());
+                }
+            }
+        }
     }
 
     @Override
@@ -66,7 +84,7 @@ public final class SearchableCreativeScreen extends GuiContainerCreative {
             List<ItemStack> ours = currentTab() == CreativeTabs.tabAllSearch
                     ? CreativeSearch.search(text) : null;
             Container container = this.inventorySlots;
-            @SuppressWarnings("unchecked")
+
             List<Object> list = (List<Object>) itemListField().get(container);
             list.clear();
             if (ours != null) {
@@ -76,7 +94,8 @@ public final class SearchableCreativeScreen extends GuiContainerCreative {
             }
             scrollField().setFloat(this, 0.0F);
             scrollToMethod().invoke(container, Float.valueOf(0.0F));
-        } catch (Throwable t) {
+        } catch (Exception | LinkageError t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
             fail(t);
         }
     }
@@ -126,11 +145,12 @@ public final class SearchableCreativeScreen extends GuiContainerCreative {
     private GuiTextField searchBox() {
         try {
             if (searchBoxField == null) {
-                // the box is a private field and 1.7.10 has no accessor for it
+
                 searchBoxField = Reflect.field(GuiContainerCreative.class, "searchField", "field_147062_A");
             }
             return (GuiTextField) searchBoxField.get(this);
-        } catch (Throwable t) {
+        } catch (Exception | LinkageError t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
             fail(t);
             return null;
         }

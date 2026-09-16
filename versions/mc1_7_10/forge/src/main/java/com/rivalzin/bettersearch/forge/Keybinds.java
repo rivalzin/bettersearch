@@ -18,6 +18,14 @@ public final class Keybinds {
 
     @SubscribeEvent
     public void onKeyInput(InputEvent.KeyInputEvent event) {
+
+        if (Minecraft.getMinecraft().currentScreen != null) {
+
+            while (openKey.isPressed()) {
+
+            }
+            return;
+        }
         boolean official = openKey.isPressed();
         if (openKey.getKeyCode() != Keyboard.KEY_O) {
             if (official) {

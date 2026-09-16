@@ -21,6 +21,10 @@ public final class Keybinds {
 
     @SubscribeEvent
     public void onKeyInput(InputEvent.KeyInputEvent event) {
+
+        if (Minecraft.getMinecraft().currentScreen != null) {
+            return;
+        }
         if (openKey.isPressed() || altComboPressed()) {
             Minecraft.getMinecraft().displayGuiScreen(new BetterSearchConfigScreen(null));
         }

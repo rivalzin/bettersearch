@@ -19,8 +19,7 @@ import java.util.Map;
 public final class LangTable {
     private static volatile Map<String, Map<String, String>> table;
     private static volatile int stamp;
-    // the client tick and the viewer thread both come through here, and a plain
-    // read-then-write let the two of them start the same work twice
+
     private static final java.util.concurrent.atomic.AtomicBoolean loading =
             new java.util.concurrent.atomic.AtomicBoolean();
 
@@ -29,7 +28,7 @@ public final class LangTable {
     private LangTable() {
     }
 
-    public static void invalidate() {
+    public static synchronized void invalidate() {
         generation++;
         table = null;
     }
@@ -62,7 +61,7 @@ public final class LangTable {
         return out;
     }
 
-    public static void ensure(SearchSettings settings) {
+    public static synchronized void ensure(SearchSettings settings) {
         if (table != null || loading.get() || !settings.crossLanguage) {
             return;
         }
@@ -92,20 +91,27 @@ public final class LangTable {
                                         new ResourceLocation(domain, "lang/" + code + ".lang"))) {
                                     read(resource, translations);
                                 }
-                            } catch (Throwable noFile) {
+                            } catch (Exception noFile) {
+                                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(noFile);
                             }
                         }
                         if (!translations.isEmpty()) {
                             fresh.put(code, translations);
                         }
                     }
-                    if (generation != loadGeneration) {
-                        BetterSearch.LOGGER.debug("[{}] language table dropped, list changed while loading.get()",
-                                BetterSearch.MOD_NAME);
-                        return;
+                    synchronized (LangTable.class) {
+
+                        if (generation != loadGeneration) {
+
+                            return;
+
+                        }
+
+                        table = java.util.Collections.unmodifiableMap(fresh);
+
+                        stamp++;
+
                     }
-                    table = fresh;
-                    stamp++;
                     int total = 0;
                     for (Map<String, String> m : fresh.values()) {
                         total += m.size();
@@ -121,15 +127,13 @@ public final class LangTable {
             worker.start();
             queued = true;
         } finally {
-            // nothing was queued, so the flag has to come back down here:
-            // otherwise one throw closes this path for the rest of the session
+
             if (!queued) {
                 loading.set(false);
             }
         }
     }
 
-    // a star means every language the game lists, the same as on the other versions
     private static List<String> everyGameLanguage() {
         List<String> out = new ArrayList<>();
         for (LanguageCatalog.Entry entry : LanguageCatalog.available()) {
@@ -151,7 +155,8 @@ public final class LangTable {
                     target.put(line.substring(0, same), line.substring(same + 1));
                 }
             }
-        } catch (Throwable t) {
+        } catch (Exception t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
             BetterSearch.LOGGER.debug("[{}] skipped language file: {}",
                     BetterSearch.MOD_NAME, t.toString());
         }

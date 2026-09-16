@@ -2,6 +2,8 @@ package com.rivalzin.bettersearch.forge.jei;
 
 import com.rivalzin.bettersearch.BetterSearch;
 import com.rivalzin.bettersearch.client.ModConfig;
+import com.rivalzin.bettersearch.client.LangTable;
+import net.minecraft.client.Minecraft;
 import mezz.jei.Internal;
 import mezz.jei.ingredients.IngredientFilter;
 import mezz.jei.suffixtree.CombinedSearchTrees;
@@ -13,6 +15,8 @@ public final class JeiIntegration {
     private static boolean announced;
     private static int appliedStamp = -1;
     private static int appliedGeneration = -1;
+    private static int appliedLanguageStamp = -1;
+    private static String appliedLanguage = "";
 
     private JeiIntegration() {
     }
@@ -23,7 +27,7 @@ public final class JeiIntegration {
             return;
         }
         if (treesField == null) {
-            // JEI 4.16 has no api for this, the tree field is swapped directly
+
             treesField = IngredientFilter.class.getDeclaredField("combinedSearchTrees");
             treesField.setAccessible(true);
         }
@@ -40,11 +44,16 @@ public final class JeiIntegration {
         }
 
         int stamp = ModConfig.stamp();
-        // the config stamp misses the language table and the off-thread build
+
         int generation = JeiSearchBridge.generation();
-        if (changed || stamp != appliedStamp || generation != appliedGeneration) {
+        int languageStamp = LangTable.stamp();
+        String language = Minecraft.getMinecraft().gameSettings.language;
+        if (changed || stamp != appliedStamp || generation != appliedGeneration
+                || languageStamp != appliedLanguageStamp || !language.equals(appliedLanguage)) {
             appliedStamp = stamp;
             appliedGeneration = generation;
+            appliedLanguageStamp = languageStamp;
+            appliedLanguage = language;
             filter.invalidateCache();
         }
     }

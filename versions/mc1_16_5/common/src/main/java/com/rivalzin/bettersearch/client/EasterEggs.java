@@ -22,7 +22,6 @@ public final class EasterEggs {
             Collections2.pair("minecraft:brush", Collections2.list("spacey", "spaceybubs", "xspaceybubs")),
             Collections2.pair("minecraft:yellow_dye", Collections2.list("spacey", "spaceybubs", "xspaceybubs")));
 
-    // these only fire when english is being searched, otherwise they collide
     private static final Map<String, List<String>> ENGLISH = Collections2.map(
 
             Collections2.pair("minecraft:crafting_table", Collections2.list("workbench")));

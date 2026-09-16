@@ -3,7 +3,6 @@ package com.rivalzin.bettersearch.core;
 import java.util.ArrayList;
 import java.util.List;
 
-// parsed once per keystroke, then reused for every item
 public final class SearchQuery {
     public final String raw;
 
@@ -27,7 +26,31 @@ public final class SearchQuery {
         return tokens.length == 0 && modFilters.length == 0;
     }
 
+    public boolean isBrowseOnly() {
+        return tokens.length == 0 && modFilters.length > 0;
+    }
+
+    public static boolean isBrowsingByMod(String rawQuery) {
+        if (rawQuery == null) {
+            return false;
+        }
+        boolean any = false;
+        for (String piece : rawQuery.split("\\s+")) {
+            if (piece.isEmpty()) {
+                continue;
+            }
+            if (piece.charAt(0) != '@' || piece.length() < 2) {
+                return false;
+            }
+            any = true;
+        }
+        return any;
+    }
+
     public static SearchQuery parse(String rawQuery, SearchSettings settings) {
+        if (rawQuery == null) {
+            rawQuery = "";
+        }
         List<String> tokens = new ArrayList<>(4);
         List<String> mods = new ArrayList<>(1);
 

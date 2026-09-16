@@ -1,0 +1,13 @@
+{
+  "required": false,
+  "minVersion": "0.8.4",
+  "package": "com.rivalzin.bettersearch.mixin.jei",
+  "plugin": "com.rivalzin.bettersearch.mixin.jei.JeiMixinPlugin",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "IngredientFilterMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

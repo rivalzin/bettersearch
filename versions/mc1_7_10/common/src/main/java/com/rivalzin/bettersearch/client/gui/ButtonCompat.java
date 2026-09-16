@@ -8,7 +8,6 @@ public final class ButtonCompat {
     private ButtonCompat() {
     }
 
-    // the button constructor changed shape almost every version
     public static Builder builder(String text, Consumer<GuiButton> action) {
         return new Builder(text, action);
     }

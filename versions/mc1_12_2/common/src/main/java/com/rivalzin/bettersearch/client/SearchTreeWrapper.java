@@ -29,7 +29,7 @@ public final class SearchTreeWrapper<T> extends SearchTree<T> {
     }
 
     @Override
-    // null from us = fall back to vanilla instead of showing nothing
+
     public List<T> search(String query) {
         List<T> ours = finder.apply(query);
         return ours != null ? ours : vanilla.search(query);

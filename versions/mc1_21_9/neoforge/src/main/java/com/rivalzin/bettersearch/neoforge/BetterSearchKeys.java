@@ -25,21 +25,28 @@ public final class BetterSearchKeys {
             GLFW.GLFW_KEY_O,
             CATEGORY);
 
+    private static boolean pending;
+
     private BetterSearchKeys() {
     }
 
     static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
         event.registerCategory(CATEGORY);
         event.register(OPEN_CONFIG);
+        KeyConflictGuard.listenAlt(() -> Minecraft.getInstance().hasAltDown());
+
+        KeyConflictGuard.holdOnly(mapping -> mapping.getKeyModifier() == KeyModifier.NONE);
     }
 
     static void onClientTick(ClientTickEvent.Post event) {
-        // a control on the same key stands down while Alt is held; drop the Alt
-        // from the shortcut and nothing is held back
-        KeyConflictGuard.update(OPEN_CONFIG, OPEN_CONFIG.getKeyModifier() == KeyModifier.ALT,
-                Minecraft.getInstance().hasAltDown());
+
+        KeyConflictGuard.update(OPEN_CONFIG, OPEN_CONFIG.getKeyModifier() == KeyModifier.ALT);
 
         while (OPEN_CONFIG.consumeClick()) {
+            pending = true;
+        }
+        if (pending) {
+            pending = false;
             BetterSearchClient.openConfigScreen();
         }
     }

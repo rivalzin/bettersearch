@@ -52,7 +52,9 @@ public final class BetterSearchNeoForge {
                 Class.forName(half[1]).getMethod("install", IEventBus.class).invoke(null, modEventBus);
                 return;
             } catch (ClassNotFoundException otherHalf) {
-            } catch (Throwable t) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(otherHalf);
+            } catch (Exception | LinkageError t) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
                 BetterSearch.LOGGER.warn("[{}] failed to register reload listener: {}",
                         BetterSearch.MOD_NAME, t.toString());
                 return;

@@ -8,7 +8,6 @@ public final class Reflect {
     private Reflect() {
     }
 
-    // MCP name first, SRG second - dev and obf runs each hit one
     public static Field field(Class<?> type, String... names) {
         for (String name : names) {
             try {
@@ -16,6 +15,7 @@ public final class Reflect {
                 field.setAccessible(true);
                 return field;
             } catch (NoSuchFieldException findNext) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(findNext);
             }
         }
         throw new IllegalStateException("no field " + Arrays.toString(names) + " in " + type.getName());
@@ -28,6 +28,7 @@ public final class Reflect {
                 method.setAccessible(true);
                 return method;
             } catch (NoSuchMethodException findNext) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(findNext);
             }
         }
         throw new IllegalStateException("no method " + Arrays.toString(names) + " in " + type.getName());

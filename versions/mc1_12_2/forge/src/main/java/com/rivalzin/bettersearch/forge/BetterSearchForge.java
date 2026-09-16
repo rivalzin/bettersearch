@@ -8,7 +8,7 @@ import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 
 @Mod(modid = BetterSearch.MOD_ID,
         name = BetterSearch.MOD_NAME,
-        version = "1.3.0",
+        version = BetterSearch.VERSION,
         clientSideOnly = true,
         acceptedMinecraftVersions = "[1.12.2]")
 public final class BetterSearchForge {

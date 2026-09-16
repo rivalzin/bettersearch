@@ -5,7 +5,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-// plain fields on purpose: this is read millions of times per search
 public final class SearchSettings {
     public static final List<String> DEFAULT_LANGUAGES = Collections.unmodifiableList(Arrays.asList(
             "en_us", "es_es", "es_mx", "pt_br", "pt_pt", "fr_fr", "de_de", "it_it",
@@ -65,34 +64,39 @@ public final class SearchSettings {
     public int maxResults = 0;
 
     public SearchSettings copy() {
-        SearchSettings s = new SearchSettings();
-        s.enabled = enabled;
-        s.searchCreative = searchCreative;
-        s.searchRecipeBook = searchRecipeBook;
-        s.searchPlayerNames = searchPlayerNames;
-        s.searchCommandItems = searchCommandItems;
-        s.fixCommandErrors = fixCommandErrors;
-        s.fixVersionNames = fixVersionNames;
-        s.commandSuggestionLimit = commandSuggestionLimit;
-        s.searchJei = searchJei;
-        s.searchEmi = searchEmi;
-        s.searchRei = searchRei;
-        s.typoTolerance = typoTolerance;
-        s.minTypoLength = minTypoLength;
-        s.matchInitials = matchInitials;
-        s.ignoreSpaces = ignoreSpaces;
-        s.crossLanguage = crossLanguage;
-        s.languages = new ArrayList<>(languages);
-        s.foreignStrictOnly = foreignStrictOnly;
-        s.sortByRelevance = sortByRelevance;
-        s.searchTooltips = searchTooltips;
-        s.searchItemIds = searchItemIds;
-        s.searchModIds = searchModIds;
-        s.fuzzyThreshold = fuzzyThreshold;
-        s.crossFieldMatching = crossFieldMatching;
-        s.crossFieldThreshold = crossFieldThreshold;
-        s.maxResults = maxResults;
-        return s;
+        SearchSettings copy = new SearchSettings();
+        copy.copyFrom(this);
+        return copy;
+    }
+
+    public void copyFrom(SearchSettings source) {
+        java.util.Objects.requireNonNull(source, "source");
+        enabled = source.enabled;
+        searchCreative = source.searchCreative;
+        searchRecipeBook = source.searchRecipeBook;
+        searchPlayerNames = source.searchPlayerNames;
+        searchCommandItems = source.searchCommandItems;
+        fixCommandErrors = source.fixCommandErrors;
+        fixVersionNames = source.fixVersionNames;
+        commandSuggestionLimit = source.commandSuggestionLimit;
+        searchJei = source.searchJei;
+        searchEmi = source.searchEmi;
+        searchRei = source.searchRei;
+        typoTolerance = source.typoTolerance;
+        minTypoLength = source.minTypoLength;
+        matchInitials = source.matchInitials;
+        ignoreSpaces = source.ignoreSpaces;
+        crossLanguage = source.crossLanguage;
+        languages = new ArrayList<>(source.languages == null ? DEFAULT_LANGUAGES : source.languages);
+        foreignStrictOnly = source.foreignStrictOnly;
+        sortByRelevance = source.sortByRelevance;
+        searchTooltips = source.searchTooltips;
+        searchItemIds = source.searchItemIds;
+        searchModIds = source.searchModIds;
+        fuzzyThreshold = source.fuzzyThreshold;
+        crossFieldMatching = source.crossFieldMatching;
+        crossFieldThreshold = source.crossFieldThreshold;
+        maxResults = source.maxResults;
     }
 
     public void sanitize() {
@@ -120,11 +124,12 @@ public final class SearchSettings {
     }
 
     public boolean indexesAllLanguages() {
-        return languages.contains("*");
+        return languages != null && languages.contains("*");
     }
 
     public boolean indexesLanguage(String code) {
-        return crossLanguage && (indexesAllLanguages() || languages.contains(code));
+        return crossLanguage && (indexesAllLanguages()
+                || (languages == null ? DEFAULT_LANGUAGES : languages).contains(code));
     }
 
     public boolean affectsIndex(SearchSettings other) {
@@ -134,8 +139,6 @@ public final class SearchSettings {
                 || !sameLanguages(languages, other.languages);
     }
 
-    // the list is a set here too: turning a language off and back on used to look like a
-    // change and threw away every lang file the pack ships
     public boolean affectsLanguageTable(SearchSettings other) {
         return crossLanguage != other.crossLanguage || !sameLanguages(languages, other.languages);
     }
@@ -193,7 +196,6 @@ public final class SearchSettings {
                 languages == null ? null : new java.util.HashSet<>(languages));
     }
 
-    // the language list is a set: order never changes what gets indexed
     private static boolean sameLanguages(java.util.List<String> a, java.util.List<String> b) {
         if (a == b) {
             return true;
@@ -209,7 +211,7 @@ public final class SearchSettings {
         return "SearchSettings{enabled=" + enabled
                 + ", typoTolerance=" + typoTolerance
                 + ", crossLanguage=" + crossLanguage
-                + ", languages=" + Arrays.toString(languages.toArray())
+                + ", languages=" + languages
                 + ", foreignStrictOnly=" + foreignStrictOnly
                 + ", sortByRelevance=" + sortByRelevance
                 + ", searchTooltips=" + searchTooltips

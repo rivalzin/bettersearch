@@ -6,31 +6,35 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 
-// each entry keeps its fields in a plain array: the search reads them, never rebuilds them
 public final class SearchIndex<T> {
     public static final class Entry<T> {
         public final T value;
-        public final SearchField[] fields;
+        private final SearchField[] fields;
 
         public final String modId;
 
-        // what kind of thing this is, read off the end of the registry name: boots, button,
-        // egg. Empty when there is no registry name to read it from.
         public final String family;
 
-        // resolved here and not while sorting: the family never changes after the index is
-        // built, and looking these two up per keystroke was the whole cost of grouping
         final String kind;
         final int place;
 
         public Entry(T value, SearchField[] fields, String modId, String family) {
             this.value = value;
-            this.fields = fields;
+            this.fields = Objects.requireNonNull(fields, "fields").clone();
+            for (SearchField field : this.fields) {
+                Objects.requireNonNull(field, "field");
+            }
             this.modId = modId == null ? "" : modId;
             this.family = family == null ? "" : family;
             this.kind = ItemKinds.kindOf(this.family);
             this.place = ItemKinds.orderOf(this.family);
+        }
+
+        public SearchField[] fields() {
+            return fields.clone();
         }
     }
 
@@ -39,38 +43,62 @@ public final class SearchIndex<T> {
     private static final int BONUS_FOREIGN = 40;
     private static final int BONUS_ID = 60;
     private static final int BONUS_TOOLTIP = -250;
-    private static final int BONUS_IN_ORDER = 250;
-    private static final int BONUS_STARTS_AT_BEGINNING = 150;
-    private static final int COVERAGE_WEIGHT = 400;
     private static final int TYPO_PENALTY = 150;
     private static final int CROSS_FIELD_PENALTY = 600;
-    // sorting a long[] beats a Comparator by a mile, so score and position share one number;
-    // the offset only keeps the high word positive for every score the matcher can produce
+
     private static final int SCORE_OFFSET = 1_000_000;
 
-    // the low word of the packed key holds the position in the list
     private static final long INDEX_MASK = 0x7FFFFFFFL;
 
-    // no position, so no member of the kind is hoisted out of its canonical place
     private static final int NO_WINNER = -1;
 
-    // one full match tier: scoreField multiplies the tier by 100 and the tiers are 10 apart
     private static final long CLEAR_WIN = 1000L;
 
     private final List<Entry<T>> entries;
     private final boolean grouped;
+    private final int[] kindIds;
+    private final int kindCount;
+    private final AtomicReference<Workspace> idleWorkspace = new AtomicReference<>();
+
+    private static final class Workspace {
+        final FuzzyMatcher.Scratch matcher = new FuzzyMatcher.Scratch();
+        final int[] scores;
+        final long[] packed;
+        final int[] ranks;
+        final int[] winners;
+        final long[] bestScores;
+
+        Workspace(int size, int kinds) {
+            scores = new int[size];
+            packed = new long[size];
+            ranks = new int[kinds];
+            winners = new int[kinds];
+            bestScores = new long[kinds];
+        }
+    }
 
     public SearchIndex(List<Entry<T>> entries) {
         this(entries, true);
     }
 
-    /**
-     * Grouping is for a list the player reads whole. A command suggestion box stops at twelve
-     * lines, so grouping there only pushes the name being typed past the end of it.
-     */
     public SearchIndex(List<Entry<T>> entries, boolean grouped) {
-        this.entries = entries;
+        this.entries = Collections.unmodifiableList(new ArrayList<>(Objects.requireNonNull(entries, "entries")));
         this.grouped = grouped;
+        this.kindIds = new int[this.entries.size()];
+        Map<String, Integer> kinds = new HashMap<>();
+        int nextKind = 0;
+        for (int i = 0; i < this.entries.size(); i++) {
+            Entry<T> entry = Objects.requireNonNull(this.entries.get(i), "entry");
+            Integer known = entry.family.isEmpty() ? null : kinds.get(entry.kind);
+            if (known == null) {
+                known = nextKind++;
+                if (!entry.family.isEmpty()) {
+                    kinds.put(entry.kind, known);
+                }
+            }
+            kindIds[i] = known;
+        }
+        this.kindCount = nextKind;
     }
 
     public int size() {
@@ -81,20 +109,37 @@ public final class SearchIndex<T> {
         return entries;
     }
 
-    // the strict pass always runs; the two expensive ones only when it found too little,
-    // and an entry already scored is skipped, so no entry is ever read twice
     public List<T> search(SearchQuery query, SearchSettings settings) {
-        if (query.isEmpty()) {
-            List<T> all = new ArrayList<>(entries.size());
+        if (query.tokens.length == 0) {
+            int limit = settings.maxResults > 0 ? Math.min(settings.maxResults, entries.size()) : entries.size();
+            List<T> all = new ArrayList<>(limit);
             for (Entry<T> e : entries) {
-                all.add(e.value);
+                if (matchesModFilter(e, query)) {
+                    all.add(e.value);
+                    if (all.size() == limit) {
+                        break;
+                    }
+                }
             }
             return all;
         }
 
+        Workspace workspace = idleWorkspace.getAndSet(null);
+        if (workspace == null) {
+            workspace = new Workspace(entries.size(), grouped ? kindCount : 0);
+        }
+        try {
+            return search(query, settings, workspace);
+        } finally {
+            idleWorkspace.compareAndSet(null, workspace);
+        }
+    }
+
+    private List<T> search(SearchQuery query, SearchSettings settings, Workspace workspace) {
+
         final int n = entries.size();
-        final FuzzyMatcher.Scratch scratch = new FuzzyMatcher.Scratch();
-        final int[] scores = new int[n];
+        final FuzzyMatcher.Scratch scratch = workspace.matcher;
+        final int[] scores = workspace.scores;
         Arrays.fill(scores, Integer.MIN_VALUE);
 
         final MatchPolicy strict = MatchPolicy.of(settings, false);
@@ -117,18 +162,18 @@ public final class SearchIndex<T> {
             return Collections.emptyList();
         }
 
-        long[] packed = new long[hits];
+        long[] packed = workspace.packed;
         int w = 0;
         for (int i = 0; i < n && w < hits; i++) {
             if (scores[i] != Integer.MIN_VALUE) {
                 packed[w++] = ((long) (SCORE_OFFSET - scores[i]) << 32) | (long) i;
             }
         }
-        if (settings.sortByRelevance) {
+
+        if (settings.sortByRelevance && !query.isBrowseOnly()) {
             Arrays.sort(packed, 0, w);
-            // "@mod" alone is browsing, not searching: that list stays as the game shows it
-            if (grouped && query.tokens.length > 0) {
-                regroupByKind(packed, w);
+            if (grouped) {
+                regroupByKind(packed, w, workspace);
             }
         }
 
@@ -140,38 +185,27 @@ public final class SearchIndex<T> {
         return out;
     }
 
-    /**
-     * Puts every pair of boots next to the other boots, and the boots next to the helmet.
-     * The score picks which kind of thing leads and which piece of it leads the kind; inside
-     * the kind the pieces follow the order a player expects to read them in, and pieces of
-     * the same family follow the order the list itself is in.
-     */
-    private void regroupByKind(long[] packed, int count) {
-        Map<String, Integer> ranks = new HashMap<>();
-        int[] bestOfRank = new int[count];
-        long[] bestScoreOfRank = new long[count];
+    private void regroupByKind(long[] packed, int count, Workspace workspace) {
+        int[] ranks = workspace.ranks;
+        Arrays.fill(ranks, -1);
+        int[] bestOfRank = workspace.winners;
+        long[] bestScoreOfRank = workspace.bestScores;
         int next = 0;
         for (int i = 0; i < count; i++) {
             long score = packed[i] >>> 32;
             int index = (int) (packed[i] & INDEX_MASK);
-            Entry<T> entry = entries.get(index);
-            boolean alone = entry.family.isEmpty();
             int rank;
-            Integer known = alone ? null : ranks.get(entry.kind);
-            if (known == null) {
-                // packed arrives in score order, so the first one seen in a kind is the one
-                // that matched best
+            int kind = kindIds[index];
+            int known = ranks[kind];
+            if (known < 0) {
+
                 rank = next++;
                 bestOfRank[rank] = index;
                 bestScoreOfRank[rank] = score;
-                if (!alone) {
-                    ranks.put(entry.kind, rank);
-                }
+                ranks[kind] = rank;
             } else {
                 rank = known;
-                // Only a win by a whole tier counts. A kind whose pieces all matched about as
-                // well has no winner to pull out, and pulling one out on a few points of
-                // difference is what would break the head-to-feet run of a set.
+
                 if (score - bestScoreOfRank[rank] < CLEAR_WIN) {
                     bestOfRank[rank] = NO_WINNER;
                 }
@@ -182,8 +216,6 @@ public final class SearchIndex<T> {
         orderInsideKinds(packed, count, bestOfRank);
     }
 
-    // Each kind is now one run of the array. Only the run is reordered, so the kinds stay
-    // where the score put them.
     private void orderInsideKinds(long[] packed, int count, int[] bestOfRank) {
         int start = 0;
         while (start < count) {
@@ -199,8 +231,6 @@ public final class SearchIndex<T> {
         }
     }
 
-    // Every entry in the run carries the same rank, so the position alone rebuilds the packed
-    // value: the run can be rewritten as plain sort keys, sorted, and packed again.
     private void sortRun(long[] packed, int from, int to, int best, long rank) {
         if (alreadyInPlace(packed, from, to, best)) {
             return;
@@ -217,8 +247,6 @@ public final class SearchIndex<T> {
         }
     }
 
-    // Almost every run is one family with no winner to hoist, and then the list is already
-    // the way it should come out. Checking costs one pass and saves the sort.
     private boolean alreadyInPlace(long[] packed, int from, int to, int best) {
         int previousPlace = -1;
         for (int i = from; i < to; i++) {
@@ -237,7 +265,7 @@ public final class SearchIndex<T> {
 
     private int scan(SearchQuery query, SearchSettings settings, FuzzyMatcher.Scratch scratch,
                      int[] scores, MatchPolicy policy, MatchPolicy foreignPolicy) {
-        MatchPolicy strict = new MatchPolicy(false, policy.allowInitials(), policy.allowCompact());
+        MatchPolicy strict = MatchPolicy.of(settings, false);
         int found = 0;
         for (int i = 0; i < entries.size(); i++) {
             if (scores[i] != Integer.MIN_VALUE) {
@@ -287,7 +315,7 @@ public final class SearchIndex<T> {
 
     private int scanCrossField(SearchQuery query, SearchSettings settings, FuzzyMatcher.Scratch scratch,
                                int[] scores, MatchPolicy policy, MatchPolicy foreignPolicy) {
-        MatchPolicy strict = new MatchPolicy(false, policy.allowInitials(), policy.allowCompact());
+        MatchPolicy strict = MatchPolicy.of(settings, false);
         int found = 0;
         for (int i = 0; i < entries.size(); i++) {
             if (scores[i] != Integer.MIN_VALUE) {
@@ -329,10 +357,13 @@ public final class SearchIndex<T> {
                     }
                     int tier = FuzzyMatcher.matchToken(field, query.tokens[t], query.tokenMasks[t],
                             query.maxDistances[t], fieldPolicy, scratch);
-                    if (tier > bestTier) {
+                    int bonus = sourceBonus(field.source);
+                    if (tier > bestTier || (tier == bestTier
+                            && bonus - TYPO_PENALTY * scratch.distance
+                            > bestBonus - TYPO_PENALTY * bestDistance)) {
                         bestTier = tier;
                         bestDistance = scratch.distance;
-                        bestBonus = sourceBonus(field.source);
+                        bestBonus = bonus;
                     }
                 }
                 if (bestTier == FuzzyMatcher.NO_MATCH) {
@@ -369,45 +400,9 @@ public final class SearchIndex<T> {
 
     private static int scoreField(SearchField field, SearchQuery query, MatchPolicy policy,
                                   FuzzyMatcher.Scratch scratch) {
-        int minTier = Integer.MAX_VALUE;
-        int totalDistance = 0;
-        int matchedChars = 0;
-        int lastPosition = -1;
-        boolean inOrder = true;
-        boolean startsAtBeginning = false;
-
-        for (int i = 0; i < query.tokens.length; i++) {
-            String token = query.tokens[i];
-            int tier = FuzzyMatcher.matchToken(field, token, query.tokenMasks[i],
-                    query.maxDistances[i], policy, scratch);
-            if (tier == FuzzyMatcher.NO_MATCH) {
-                return Integer.MIN_VALUE;
-            }
-            minTier = Math.min(minTier, tier);
-            totalDistance += scratch.distance;
-            matchedChars += token.length();
-            if (scratch.position < lastPosition) {
-                inOrder = false;
-            }
-            lastPosition = scratch.position;
-            if (i == 0 && scratch.position == 0) {
-                startsAtBeginning = true;
-            }
-        }
-
-        int score = minTier * 100 + sourceBonus(field.source);
-        if (inOrder) {
-            score += BONUS_IN_ORDER;
-        }
-        if (startsAtBeginning) {
-            score += BONUS_STARTS_AT_BEGINNING;
-        }
-        score += (int) Math.min(COVERAGE_WEIGHT,
-                (long) COVERAGE_WEIGHT * matchedChars / Math.max(1, field.text.length()));
-        score -= TYPO_PENALTY * totalDistance;
-        return score;
+        int score = FieldScorer.score(field, query, policy, scratch);
+        return score == Integer.MIN_VALUE ? score : score + sourceBonus(field.source);
     }
-
     private static int sourceBonus(byte source) {
         switch (source) {
             case SearchField.SOURCE_NATIVE:  return BONUS_NATIVE;

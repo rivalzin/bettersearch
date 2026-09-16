@@ -6,7 +6,6 @@ import net.minecraft.client.gui.GuiButton;
 
 import java.util.function.Consumer;
 
-// the knob animates on render time, not on tick
 public final class ToggleSwitch extends GuiButton implements Pressable {
     public static final int WIDTH = 28;
     public static final int HEIGHT = 14;
@@ -25,7 +24,6 @@ public final class ToggleSwitch extends GuiButton implements Pressable {
         this.animationFrom = value ? 1.0F : 0.0F;
         this.animationStart = 0L;
     }
-
 
     @Override
     public void onPress() {

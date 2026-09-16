@@ -150,7 +150,6 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen implements 
                         v -> settings.searchCreative = v, DEFAULTS.searchCreative)
                         .preview(previewOf("search_creative"));
 
-                // own picture: here the option is NEI, and the other versions show the JEI icon
                 addToggle("search_jei", () -> settings.searchJei,
                         v -> settings.searchJei = v, DEFAULTS.searchJei)
                         .preview(previewOf("search_nei"));
@@ -218,33 +217,7 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen implements 
     }
 
     private static void copyInto(SearchSettings source, SearchSettings target) {
-        SearchSettings copy = source.copy();
-        target.enabled = copy.enabled;
-        target.searchCreative = copy.searchCreative;
-        target.searchRecipeBook = copy.searchRecipeBook;
-        target.searchPlayerNames = copy.searchPlayerNames;
-        target.searchCommandItems = copy.searchCommandItems;
-        target.fixCommandErrors = copy.fixCommandErrors;
-        target.fixVersionNames = copy.fixVersionNames;
-        target.commandSuggestionLimit = copy.commandSuggestionLimit;
-        target.searchJei = copy.searchJei;
-        target.searchEmi = copy.searchEmi;
-        target.searchRei = copy.searchRei;
-        target.typoTolerance = copy.typoTolerance;
-        target.minTypoLength = copy.minTypoLength;
-        target.matchInitials = copy.matchInitials;
-        target.ignoreSpaces = copy.ignoreSpaces;
-        target.crossLanguage = copy.crossLanguage;
-        target.languages = copy.languages;
-        target.foreignStrictOnly = copy.foreignStrictOnly;
-        target.sortByRelevance = copy.sortByRelevance;
-        target.searchTooltips = copy.searchTooltips;
-        target.searchItemIds = copy.searchItemIds;
-        target.searchModIds = copy.searchModIds;
-        target.fuzzyThreshold = copy.fuzzyThreshold;
-        target.crossFieldMatching = copy.crossFieldMatching;
-        target.crossFieldThreshold = copy.crossFieldThreshold;
-        target.maxResults = copy.maxResults;
+        target.copyFrom(source);
     }
 
     @Override
@@ -281,7 +254,8 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen implements 
             Class<?> desktop = Class.forName("java.awt.Desktop");
             Object instance = desktop.getMethod("getDesktop").invoke(null);
             desktop.getMethod("browse", java.net.URI.class).invoke(instance, new java.net.URI(url));
-        } catch (Throwable t) {
+        } catch (Exception | LinkageError t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
             BetterSearch.LOGGER.warn("[{}] could not open link {}", BetterSearch.MOD_NAME, url, t);
         }
     }
@@ -290,6 +264,13 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen implements 
     public void onClose() {
         ModConfig.apply(settings);
         super.onClose();
+    }
+
+    @Override
+    public void onGuiClosed() {
+
+        ModConfig.apply(settings);
+        super.onGuiClosed();
     }
 
     private static String typoToleranceLabel(int value) {

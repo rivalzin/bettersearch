@@ -28,14 +28,20 @@ public abstract class IngredientFilterMixin {
     private void bettersearch$search(String filterText,
                                      CallbackInfoReturnable<Stream<ITypedIngredient<?>>> cir) {
         Stream<ITypedIngredient<?>> original = cir.getReturnValue();
-        if (original == null) {
+        if (original == null || !JeiSearch.wants(filterText)) {
             return;
         }
 
         List<ITypedIngredient<?>> fromJei = original.toList();
-        List<ITypedIngredient<?>> ours = JeiSearch.search(filterText, fromJei,
-                elementSearch.getAllIngredients(), ingredientManager,
-                (IngredientFilter) (Object) this);
-        cir.setReturnValue((ours == null ? fromJei : ours).stream());
+
+        try {
+            List<ITypedIngredient<?>> ours = JeiSearch.search(filterText, fromJei,
+                    elementSearch.getAllIngredients(), ingredientManager,
+                    (IngredientFilter) (Object) this, elementSearch);
+            cir.setReturnValue((ours == null ? fromJei : ours).stream());
+        } catch (Exception | LinkageError t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
+            cir.setReturnValue(fromJei.stream());
+        }
     }
 }

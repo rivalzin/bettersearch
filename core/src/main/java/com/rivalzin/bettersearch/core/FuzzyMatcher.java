@@ -1,8 +1,7 @@
 package com.rivalzin.bettersearch.core;
 
 public final class FuzzyMatcher {
-    // the tier is the biggest part of the score, not a first sort key: SearchIndex adds
-    // where the text came from on top, so a name can still beat a tooltip one tier above
+
     public static final int TIER_EXACT = 100;
 
     public static final int TIER_PREFIX = 90;
@@ -15,7 +14,6 @@ public final class FuzzyMatcher {
 
     public static final int TIER_SUBSTRING = 50;
 
-    // obwc -> Oak Boat with Chest, only when nothing better matched
     public static final int TIER_INITIALS = 40;
 
     public static final int TIER_TYPO = 30;
@@ -30,7 +28,6 @@ public final class FuzzyMatcher {
 
         public int distance;
 
-        // three rolling rows are enough for Damerau, and they are reused across items
         int[] rowA = new int[64];
         int[] rowB = new int[64];
         int[] rowC = new int[64];
@@ -71,11 +68,10 @@ public final class FuzzyMatcher {
                 return TIER_PREFIX;
             }
 
-            int[] starts = field.wordStarts;
             int bestWordTier = NO_MATCH;
             int bestWordPos = 0;
-            for (int w = 0; w < starts.length; w++) {
-                int s = starts[w];
+            for (int w = 0; w < field.wordCount(); w++) {
+                int s = field.wordStart(w);
                 int e = field.wordEnd(w);
                 if (e - s < tokenLength) {
                     continue;
@@ -102,7 +98,6 @@ public final class FuzzyMatcher {
                 return TIER_SUBSTRING;
             }
 
-            // compact comes after: with the spaces already matching, it was not the reason
             String compact = field.compact;
             if (policy.allowCompact() && compact != null && compact.length() >= tokenLength) {
                 int at = compact.indexOf(token);
@@ -126,9 +121,8 @@ public final class FuzzyMatcher {
 
         int bestDistance = maxDist + 1;
         int bestPos = 0;
-        int[] starts = field.wordStarts;
-        for (int w = 0; w < starts.length; w++) {
-            int s = starts[w];
+        for (int w = 0; w < field.wordCount(); w++) {
+            int s = field.wordStart(w);
             int e = field.wordEnd(w);
             if (e - s <= 0 || tokenLength - (e - s) > maxDist) {
                 continue;
@@ -160,7 +154,6 @@ public final class FuzzyMatcher {
         return NO_MATCH;
     }
 
-    // compact drops the spaces, so its indexes are not the text's
     private static int textPositionOf(String text, int compactIndex) {
         int seen = 0;
         for (int i = 0; i < text.length(); i++) {
@@ -190,7 +183,15 @@ public final class FuzzyMatcher {
 
     public static int prefixDistance(String token, String target, int from, int to, int max, Scratch scratch) {
         final int n = token.length();
+        if (max < 0 || from < 0 || to < from || to > target.length()) {
+            throw new IllegalArgumentException("Invalid distance bounds");
+        }
+        if (n == 0) {
+            return 0;
+        }
+        max = Math.min(max, n);
         int limit = Math.min(to, from + n + max);
+        final int unreachable = max + 1;
         scratch.ensure(n + 1);
 
         int[] prev2 = scratch.rowA;
@@ -198,16 +199,24 @@ public final class FuzzyMatcher {
         int[] cur = scratch.rowC;
 
         for (int j = 0; j <= n; j++) {
-            prev[j] = j;
+            prev[j] = Math.min(j, unreachable);
         }
         int best = n;
 
         for (int i = from + 1; i <= limit; i++) {
             char tc = target.charAt(i - 1);
             int row = i - from;
-            cur[0] = row;
-            int rowMin = row;
-            for (int j = 1; j <= n; j++) {
+            cur[0] = Math.min(row, unreachable);
+            int rowMin = cur[0];
+            int first = Math.max(1, row - max);
+            int last = Math.min(n, row + max);
+            if (first > 1) {
+                cur[first - 1] = unreachable;
+            }
+            if (last < n) {
+                cur[last + 1] = unreachable;
+            }
+            for (int j = first; j <= last; j++) {
                 char qc = token.charAt(j - 1);
                 int cost = qc == tc ? 0 : 1;
                 int v = prev[j - 1] + cost;
@@ -230,7 +239,7 @@ public final class FuzzyMatcher {
                     rowMin = v;
                 }
             }
-            if (cur[n] < best) {
+            if (last == n && cur[n] < best) {
                 best = cur[n];
             }
             if (rowMin > max) {

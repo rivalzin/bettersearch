@@ -1,7 +1,7 @@
 package com.rivalzin.bettersearch.client;
 
 import com.rivalzin.bettersearch.BetterSearch;
-import com.rivalzin.bettersearch.core.EntryBuilder;
+import com.rivalzin.bettersearch.async.EntrySnapshot;
 import com.rivalzin.bettersearch.core.SearchField;
 import com.rivalzin.bettersearch.core.SearchIndex;
 import com.rivalzin.bettersearch.core.SearchQuery;
@@ -19,7 +19,6 @@ import net.minecraft.world.item.crafting.display.SlotDisplayContext;
 import java.util.ArrayList;
 import java.util.List;
 
-// the recipe book searches collections, not single items
 public final class RecipeSearch {
     private static final AsyncIndex<RecipeCollection> INDEX = new AsyncIndex<>("recipes");
     private static boolean loggedActive;
@@ -53,7 +52,8 @@ public final class RecipeSearch {
                         BetterSearch.MOD_NAME, index.size());
             }
             return index.search(query, settings);
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
             BetterSearch.LOGGER.error("[{}] recipe search failed", BetterSearch.MOD_NAME, t);
             return null;
         }
@@ -75,25 +75,23 @@ public final class RecipeSearch {
             return null;
         }
 
-        // the recipe book calls this every tick while it is open, so nothing is copied
-        // until there is a reason to build
         final long stamp = BetterSearchClient.languageStamp();
         SearchIndex<RecipeCollection> ready = INDEX.ready(collections, collections.size(), stamp);
         if (ready != null) {
             return ready;
         }
 
-        final List<RecipeCollection> snapshot = List.copyOf(collections);
-        final LanguageTable languages = BetterSearchClient.languages();
-        final SearchSettings snapshotSettings = settings.copy();
+        return INDEX.getPrepared(collections, collections.size(), stamp, () -> {
+            final List<RecipeCollection> snapshot = List.copyOf(collections);
+            final LanguageTable languages = BetterSearchClient.languages();
+            final SearchSettings snapshotSettings = settings.copy();
 
-        final ContextMap context = SlotDisplayContext.fromLevel(minecraft.level);
-
-        return INDEX.get(collections, collections.size(), stamp,
-                () -> build(snapshot, languages, snapshotSettings, context));
+            final ContextMap context = SlotDisplayContext.fromLevel(minecraft.level);
+            return prepare(snapshot, languages, snapshotSettings, context);
+        });
     }
 
-    private static SearchIndex<RecipeCollection> build(List<RecipeCollection> collections,
+    private static java.util.function.Supplier<SearchIndex<RecipeCollection>> prepare(List<RecipeCollection> collections,
                                                        LanguageTable languages,
                                                        SearchSettings settings,
                                                        ContextMap context) {
@@ -104,11 +102,9 @@ public final class RecipeSearch {
             }
         }
 
-        List<SearchIndex.Entry<RecipeCollection>> entries = new ArrayList<>(collections.size());
-        int skipped = 0;
-        for (RecipeCollection collection : collections) {
+        return EntrySnapshot.capture(collections, collection -> {
             try {
-                EntryBuilder<RecipeCollection> builder = new EntryBuilder<>(collection);
+                EntrySnapshot<RecipeCollection> builder = new EntrySnapshot<>(collection);
                 for (RecipeDisplayEntry entry : collection.getRecipes()) {
                     for (ItemStack result : entry.resultItems(context)) {
                         if (result.isEmpty()) {
@@ -130,8 +126,7 @@ public final class RecipeSearch {
 
                         ResourceLocation id = BuiltInRegistries.ITEM.getKey(result.getItem());
                         if (id != null) {
-                            // outside the if: the mod filter and the kind of item are not the id
-                            // text, and without them a recipe loses its group and its @mod
+
                             builder.modId(id.getNamespace());
                             builder.family(id.getPath());
                             if (settings.searchItemIds) {
@@ -141,19 +136,15 @@ public final class RecipeSearch {
                         }
                     }
                 }
-                if (builder.isEmpty()) {
-                    skipped++;
-                } else {
-                    entries.add(builder.build());
+                if (!builder.isEmpty()) {
+                    return builder;
                 }
-            } catch (Throwable t) {
-                skipped++;
+            } catch (RuntimeException | LinkageError t) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
                 BetterSearch.LOGGER.debug("[{}] skipped recipe group: {}",
                         BetterSearch.MOD_NAME, t.toString());
             }
-        }
-        BetterSearch.LOGGER.info("[{}] recipe index ready: {} groups ({} with no usable result)",
-                BetterSearch.MOD_NAME, entries.size(), skipped);
-        return new SearchIndex<>(entries);
+            return null;
+        });
     }
 }

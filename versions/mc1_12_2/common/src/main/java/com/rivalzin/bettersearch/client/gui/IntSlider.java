@@ -8,7 +8,6 @@ import net.minecraft.util.math.MathHelper;
 import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
 
-// value is stepped, the vanilla slider is 0..1 doubles
 public final class IntSlider extends GuiButton {
     private final int min;
     private final int max;

@@ -5,7 +5,7 @@ import codechicken.nei.api.ItemFilter;
 
 public final class NeiSearchProviderLegacy implements SearchField.ISearchProvider {
     @Override
-    // secondary: classic NEI keeps its own filter first
+
     public boolean isPrimary() {
         return false;
     }

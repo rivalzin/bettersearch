@@ -37,9 +37,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BooleanSupplier;
 
 public final class CommandSearch {
-    // one and two letter words are almost always right, do not "fix" them
+
     private static final int MIN_WORD_LENGTH = 2;
 
     private static volatile boolean correctionOffered;
@@ -50,12 +51,11 @@ public final class CommandSearch {
     public static boolean isEnabled() {
         SearchSettings settings = BetterSearchClient.settings();
         return BetterSearchClient.isEnabled()
-                // only the tab list, the server never gets asked
+
                 && (settings.searchPlayerNames || settings.searchCommandItems
                     || settings.fixCommandErrors || settings.fixVersionNames);
     }
 
-    // red = nothing found, gold = we have a spelling for it
     private static final Style STUCK = Style.EMPTY.withColor(ChatFormatting.RED);
 
     private static final Style FIXABLE = Style.EMPTY.withColor(ChatFormatting.GOLD);
@@ -122,7 +122,8 @@ public final class CommandSearch {
                 additions.addAll(matchNames(onlinePlayerNames(), word, settings));
             }
             return merge(original, additions, start, safeCursor, settings);
-        } catch (Throwable t) {
+        } catch (Exception | LinkageError t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
             BetterSearch.LOGGER.debug("[{}] command suggestions unchanged: {}",
                     BetterSearch.MOD_NAME, t.toString());
             return original;
@@ -131,6 +132,14 @@ public final class CommandSearch {
 
     public static CompletableFuture<Suggestions> augmentCommandAsync(
             ParseResults<ClientSuggestionProvider> parse, int cursor, Suggestions original) {
+        return augmentCommandAsync(parse, cursor, original, () -> true);
+    }
+
+    public static CompletableFuture<Suggestions> augmentCommandAsync(
+            ParseResults<ClientSuggestionProvider> parse, int cursor, Suggestions original, BooleanSupplier isCurrent) {
+        if (!isCurrent.getAsBoolean()) {
+            return CompletableFuture.completedFuture(original);
+        }
         try {
             Suggestions merged = augmentCommand(parse, cursor, original);
             SearchSettings settings = BetterSearchClient.settings();
@@ -140,8 +149,9 @@ public final class CommandSearch {
                 correctionOffered = false;
                 return CompletableFuture.completedFuture(merged == null ? original : merged);
             }
-            return correct(parse, cursor, merged);
-        } catch (Throwable t) {
+            return correct(parse, cursor, merged, isCurrent);
+        } catch (Exception | LinkageError t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
             correctionOffered = false;
             BetterSearch.LOGGER.debug("[{}] command fix skipped: {}",
                     BetterSearch.MOD_NAME, t.toString());
@@ -150,7 +160,7 @@ public final class CommandSearch {
     }
 
     private static CompletableFuture<Suggestions> correct(ParseResults<ClientSuggestionProvider> parse,
-                                                          int cursor, Suggestions original) {
+                                                          int cursor, Suggestions original, BooleanSupplier isCurrent) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null || minecraft.player == null) {
             correctionOffered = false;
@@ -177,21 +187,28 @@ public final class CommandSearch {
                 dispatcher.parse(reader, minecraft.player.connection.getSuggestionsProvider());
 
         return dispatcher.getCompletionSuggestions(stub, start)
-                .thenApply(pool -> build(word, start, end, pool, original))
-                .exceptionally(t -> {
-                    correctionOffered = false;
-                    return original;
-                });
+                .handleAsync((pool, error) -> {
+                    if (error != null) {
+                        com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(error);
+                    }
+                    if (!isCurrent.getAsBoolean()) {
+                        return original;
+                    }
+                    if (error != null) {
+                        correctionOffered = false;
+                        return original;
+                    }
+                    try {
+                        return build(word, start, end, pool, original);
+                    } catch (Exception | LinkageError failure) {
+                        com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(failure);
+                        correctionOffered = false;
+                        return original;
+                    }
+                }, minecraft);
     }
-
-    // a line rarely holds more than one renamed name, and this stops the loop from ever spinning
     private static final int MAX_NAME_SWAPS = 4;
 
-    /**
-     * The line the player is about to send, with the names this version renamed swapped for the
-     * ones it takes. Only a whole name is swapped and only when the swap makes the line parse,
-     * so a typo still reaches the game and is refused: that guess stays a suggestion.
-     */
     public static String rewriteOnSend(String input) {
         try {
             if (input == null || input.length() < 2 || input.charAt(0) != '/'
@@ -218,7 +235,8 @@ public final class CommandSearch {
                 line = swapped;
             }
             return input;
-        } catch (Throwable t) {
+        } catch (Exception | LinkageError t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
             BetterSearch.LOGGER.debug("[{}] line sent as typed: {}", BetterSearch.MOD_NAME, t.toString());
             return input;
         }
@@ -245,7 +263,7 @@ public final class CommandSearch {
         if (reader.canRead() && reader.peek() == '/') {
             reader.skip();
         }
-        // getNow: the client tree answers without waiting, and a line is not worth a stall
+
         Suggestions pool = dispatcher
                 .getCompletionSuggestions(dispatcher.parse(reader, source), span[0])
                 .getNow(null);
@@ -258,7 +276,7 @@ public final class CommandSearch {
             texts.add(option.getText());
         }
         List<String> named = CommandAliases.matches(line.substring(span[0], span[1]), texts);
-        // two answers is not a choice the mod gets to make for the player
+
         if (named.size() != 1) {
             return null;
         }
@@ -280,8 +298,7 @@ public final class CommandSearch {
         int limit = settings.commandSuggestionLimit;
         List<String> chosen = new ArrayList<>();
         if (settings.fixVersionNames) {
-            // a name this version renamed comes first: /gamemode 1 here means creative, and
-            // whoever typed zombie_pigman wants this version's zombified_piglin
+
             chosen.addAll(CommandAliases.matches(word, texts));
             for (String near : CommandAliases.starting(word, texts)) {
                 if (!chosen.contains(near)) {
@@ -321,8 +338,7 @@ public final class CommandSearch {
                 stopped = Math.max(stopped, error.getCursor());
             }
         } else if (!parse.getReader().getRemaining().isEmpty()) {
-            // a literal that simply does not match throws nothing: brigadier stops the reader
-            // on that word, and the end of the line is not where that word is
+
             stopped = parse.getReader().getCursor();
         }
         if (stopped >= 0) {
@@ -335,8 +351,7 @@ public final class CommandSearch {
         }
 
         end = Math.min(end, CommandFuzzy.wordEnd(input, start));
-        // one letter is too little to guess from, and CommandFuzzy refuses it on its own;
-        // the alias table matches whole words, so /gamemode 1 has to get past here
+
         if (end <= start) {
             return null;
         }
@@ -362,7 +377,8 @@ public final class CommandSearch {
             }
             Collection<String> pool = minecraft.player.connection.getSuggestionsProvider().getCustomTabSuggestions();
             return merge(original, matchNames(pool, word, settings), start, safeCursor, settings);
-        } catch (Throwable t) {
+        } catch (Exception | LinkageError t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
             BetterSearch.LOGGER.debug("[{}] chat suggestions unchanged: {}",
                     BetterSearch.MOD_NAME, t.toString());
             return original;
@@ -438,7 +454,7 @@ public final class CommandSearch {
         }
 
         StringRange range = StringRange.between(start, cursor);
-        // ours matched input[start, cursor): a different span would replace the wrong text
+
         if (!existing.isEmpty() && !range.equals(original.getRange())) {
             return original;
         }

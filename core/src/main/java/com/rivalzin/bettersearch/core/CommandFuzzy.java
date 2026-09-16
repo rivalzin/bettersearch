@@ -6,23 +6,24 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.PriorityQueue;
+import java.util.HashSet;
+import java.util.Set;
 
 public final class CommandFuzzy {
     public static final int SAFETY_CAP = 100;
 
     private static final int SCORE_FLOOR = 380;
 
-    // percent of the name the typed letters have to cover to count as a subsequence
     private static final int SUBSEQUENCE_FLOOR = 40;
 
-    // the nearest name is only a guess worth making when the list is a menu the player
-    // could have named. Pick the nearest of ten thousand item ids and something always
-    // looks close, so /give banana would answer with an item.
     private static final int CLOSEST_MAX_OPTIONS = 200;
 
     private static final int NO_MATCH = Integer.MIN_VALUE;
 
     private static final int MIN_WORD = 2;
+    private static final Comparator<Scored> BEST_FIRST = Comparator.comparingInt(Scored::score).reversed()
+            .thenComparingInt(hit -> hit.text().length()).thenComparing(Scored::text);
 
     private CommandFuzzy() {
     }
@@ -55,14 +56,34 @@ public final class CommandFuzzy {
             return out;
         }
 
-        List<Scored> hits = new ArrayList<>();
+        int capacity = Math.min(limit, candidates.size());
+        PriorityQueue<Scored> hits = new PriorityQueue<>(Math.min(capacity, 64), BEST_FIRST.reversed());
+        Set<String> selected = new HashSet<>();
+        FuzzyMatcher.Scratch scratch = new FuzzyMatcher.Scratch();
+        long queryMask = mask(query);
         for (String candidate : candidates) {
-            if (candidate == null || candidate.isEmpty()) {
+            if (candidate == null || candidate.isEmpty() || selected.contains(candidate)) {
                 continue;
             }
-            int score = score(query, candidate);
+            if (!mightScore(query, queryMask, candidate)) {
+                continue;
+            }
+            int score = score(query, candidate, scratch);
             if (score != NO_MATCH && score >= SCORE_FLOOR) {
-                hits.add(new Scored(candidate, score));
+                Scored worst = hits.peek();
+                if (hits.size() == capacity && (score < worst.score()
+                        || score == worst.score() && !shorterOrEarlier(candidate, worst.text()))) {
+                    continue;
+                }
+                Scored hit = new Scored(candidate, score);
+                if (hits.size() < capacity) {
+                    hits.add(hit);
+                    selected.add(candidate);
+                } else if (BEST_FIRST.compare(hit, hits.peek()) < 0) {
+                    selected.remove(hits.remove().text());
+                    hits.add(hit);
+                    selected.add(candidate);
+                }
             }
         }
 
@@ -70,18 +91,17 @@ public final class CommandFuzzy {
             if (candidates.size() > CLOSEST_MAX_OPTIONS) {
                 return out;
             }
-            String closest = closest(query, candidates);
+            String closest = closest(query, candidates, scratch);
             if (closest != null) {
                 out.add(closest);
             }
             return out;
         }
 
-        hits.sort(Comparator.comparingInt(Scored::score).reversed()
-                .thenComparingInt(hit -> hit.text().length())
-                .thenComparing(Scored::text));
-        for (int i = 0; i < hits.size() && out.size() < limit; i++) {
-            out.add(hits.get(i).text());
+        List<Scored> ordered = new ArrayList<>(hits);
+        ordered.sort(BEST_FIRST);
+        for (Scored hit : ordered) {
+            out.add(hit.text());
         }
         return out;
     }
@@ -90,7 +110,100 @@ public final class CommandFuzzy {
         return best(word, candidates, SAFETY_CAP);
     }
 
-    private static String closest(String query, Collection<String> candidates) {
+    private static boolean mightScore(String query, long queryMask, String candidate) {
+        final int len = candidate.length();
+        final int qlen = query.length();
+        int cut = -1;
+        boolean tailUnderscore = false;
+        long fullMask = 0L, tailMask = 0L;
+        int fullLen = 0, tailLen = 0;
+        int fullInitials = 0, tailInitials = 0;
+        char fullFirstInitial = 0, tailFirstInitial = 0;
+        boolean starting = true, tailStarting = true;
+        char previous = 0;
+        for (int i = 0; i < len; i++) {
+            char c = candidate.charAt(i);
+            if (c > 127) {
+                return true;
+            }
+            if (c == '_' && cut >= 0) {
+                tailUnderscore = true;
+            }
+            if (c == ':' || c == '/') {
+                cut = i;
+                tailUnderscore = false;
+                tailMask = 0L;
+                tailLen = 0;
+                tailInitials = 0;
+                tailFirstInitial = 0;
+                tailStarting = true;
+            }
+            boolean letter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+            if (letter) {
+                char low = (c >= 'A' && c <= 'Z') ? (char) (c + 32) : c;
+                long bit = 1L << (low % 64);
+                boolean camel = (c >= 'A' && c <= 'Z') && (previous >= 'a' && previous <= 'z');
+                fullMask |= bit;
+                fullLen++;
+                if (starting || camel) {
+                    if (fullInitials == 0) {
+                        fullFirstInitial = low;
+                    }
+                    fullInitials++;
+                }
+                starting = false;
+                if (cut >= 0) {
+                    tailMask |= bit;
+                    tailLen++;
+                    if (tailStarting || camel) {
+                        if (tailInitials == 0) {
+                            tailFirstInitial = low;
+                        }
+                        tailInitials++;
+                    }
+                    tailStarting = false;
+                }
+            } else {
+                starting = true;
+                tailStarting = true;
+            }
+            previous = c;
+        }
+        if (regionAlive(qlen, queryMask, fullLen, fullMask)) {
+            return true;
+        }
+        boolean tailExists = cut >= 0 && cut + 1 < len;
+        if (tailExists && regionAlive(qlen, queryMask, tailLen, tailMask)) {
+            return true;
+        }
+
+        if (tailExists && tailUnderscore && Long.bitCount(queryMask & ~tailMask) <= 1) {
+            return true;
+        }
+        char q0 = query.charAt(0);
+        if (fullInitials >= 2 && fullInitials >= qlen && fullFirstInitial == q0) {
+            return true;
+        }
+        return tailExists && tailInitials >= 2 && tailInitials >= qlen && tailFirstInitial == q0;
+    }
+
+    private static boolean regionAlive(int qlen, long queryMask, int tlen, long targetMask) {
+        if (tlen == 0) {
+            return false;
+        }
+        int missing = Long.bitCount(queryMask & ~targetMask);
+        if (missing == 0 && tlen >= qlen) {
+            return true;
+        }
+        int extra = Long.bitCount(targetMask & ~queryMask);
+        if (extra == 0 && tlen >= 4 && tlen * 2 >= qlen) {
+            return true;
+        }
+        int max = maxEdits(qlen, tlen);
+        return missing <= max && extra <= max && Math.abs(qlen - tlen) <= max;
+    }
+
+    private static String closest(String query, Collection<String> candidates, FuzzyMatcher.Scratch scratch) {
         String best = null;
         double bestScore = -1.0;
         long queryMask = mask(query);
@@ -102,12 +215,12 @@ public final class CommandFuzzy {
             if (target.isEmpty() || (mask(target) & queryMask) == 0L) {
                 continue;
             }
-            double score = similarity(query, target);
+            double score = similarity(query, target, scratch);
             int cut = Math.max(candidate.lastIndexOf(':'), candidate.lastIndexOf('/'));
             if (cut >= 0 && cut + 1 < candidate.length()) {
                 String tail = letters(fold(candidate.substring(cut + 1)));
                 if (!tail.isEmpty()) {
-                    score = Math.max(score, similarity(query, tail));
+                    score = Math.max(score, similarity(query, tail, scratch));
                 }
             }
             if (score > bestScore + 1e-9
@@ -127,15 +240,26 @@ public final class CommandFuzzy {
     }
 
     static double similarity(String a, String b) {
+        return similarity(a, b, new FuzzyMatcher.Scratch());
+    }
+
+    private static double similarity(String a, String b, FuzzyMatcher.Scratch scratch) {
         int longest = Math.max(a.length(), b.length());
-        return longest == 0 ? 0.0 : commonSubsequence(a, b) / (double) longest;
+        return longest == 0 ? 0.0 : commonSubsequence(a, b, scratch) / (double) longest;
     }
 
     static int commonSubsequence(String a, String b) {
+        return commonSubsequence(a, b, new FuzzyMatcher.Scratch());
+    }
+
+    private static int commonSubsequence(String a, String b, FuzzyMatcher.Scratch scratch) {
         int la = a.length();
         int lb = b.length();
-        int[] previous = new int[lb + 1];
-        int[] current = new int[lb + 1];
+        scratch.ensure(lb + 1);
+        int[] previous = scratch.rowA;
+        int[] current = scratch.rowB;
+        java.util.Arrays.fill(previous, 0, lb + 1, 0);
+        current[0] = 0;
         for (int i = 1; i <= la; i++) {
             char ca = a.charAt(i - 1);
             for (int j = 1; j <= lb; j++) {
@@ -160,12 +284,18 @@ public final class CommandFuzzy {
     }
 
     static int score(String query, String candidate) {
-        int best = compare(query, letters(fold(candidate)));
+        return score(query, candidate, new FuzzyMatcher.Scratch());
+    }
+
+    private static int score(String query, String candidate, FuzzyMatcher.Scratch scratch) {
+        int best = compare(query, letters(fold(candidate)), scratch);
 
         int cut = Math.max(candidate.lastIndexOf(':'), candidate.lastIndexOf('/'));
         String tail = cut >= 0 && cut + 1 < candidate.length() ? candidate.substring(cut + 1) : null;
         if (tail != null) {
-            best = Math.max(best, demote(compare(query, letters(fold(tail))), 10));
+            best = Math.max(best, demote(compare(query, letters(fold(tail)), scratch), 10));
+
+            best = Math.max(best, demote(bestSegment(query, tail, scratch), 200));
         }
 
         if (query.length() >= 2) {
@@ -175,6 +305,25 @@ public final class CommandFuzzy {
             }
         }
         return best;
+    }
+
+    private static int bestSegment(String query, String tail, FuzzyMatcher.Scratch scratch) {
+        int best = NO_MATCH;
+        int start = 0;
+        int segments = 0;
+        for (int i = 0; i <= tail.length(); i++) {
+            if (i == tail.length() || tail.charAt(i) == '_') {
+                if (i > start) {
+                    segments++;
+                    if (segments > 1 || i < tail.length()) {
+                        best = Math.max(best, compare(query, letters(fold(tail.substring(start, i))), scratch));
+                    }
+                }
+                start = i + 1;
+            }
+        }
+
+        return segments >= 2 ? best : NO_MATCH;
     }
 
     private static int initialsScore(String query, String raw) {
@@ -192,7 +341,7 @@ public final class CommandFuzzy {
         return score == NO_MATCH ? NO_MATCH : score - penalty;
     }
 
-    private static int compare(String query, String target) {
+    private static int compare(String query, String target, FuzzyMatcher.Scratch scratch) {
         if (target.isEmpty()) {
             return NO_MATCH;
         }
@@ -209,14 +358,12 @@ public final class CommandFuzzy {
         if (target.length() >= 4 && target.length() * 2 >= query.length() && query.contains(target)) {
             return 640 - Math.min(160, (query.length() - target.length()) * 40);
         }
-        // suggestion lists are short, so a wrong guess is worse than none
+
         int max = maxEdits(query.length(), target.length());
-        int distance = distance(query, target, max);
-        // 5 edits score 330, under SCORE_FLOOR, so it could only hide the right candidate
+        int distance = distance(query, target, max, scratch);
+
         int byDistance = distance >= 0 ? 680 - distance * 70 : NO_MATCH;
-        // the letters in order are not enough on their own: in a list of thousands of names
-        // almost any short word hides inside some long one. Asking for two fifths of the
-        // name is wide enough for swrd -> diamond_sword and closes the nonsense.
+
         int bySubsequence = query.length() >= 4 && isSubsequence(query, target)
                 && query.length() * 100 >= target.length() * SUBSEQUENCE_FLOOR
                 ? 430 - Math.min(100, target.length() - query.length())
@@ -233,8 +380,11 @@ public final class CommandFuzzy {
         return Math.max(1, Math.min(allowed, n / 2));
     }
 
-    // three rolling rows, no full matrix - this runs per suggestion per keystroke
     static int distance(String a, String b, int max) {
+        return distance(a, b, max, new FuzzyMatcher.Scratch());
+    }
+
+    private static int distance(String a, String b, int max, FuzzyMatcher.Scratch scratch) {
         int la = a.length();
         int lb = b.length();
         if (Math.abs(la - lb) > max) {
@@ -246,9 +396,10 @@ public final class CommandFuzzy {
         if (lb == 0) {
             return la <= max ? la : -1;
         }
-        int[] beforePrevious = new int[lb + 1];
-        int[] previous = new int[lb + 1];
-        int[] current = new int[lb + 1];
+        scratch.ensure(lb + 1);
+        int[] beforePrevious = scratch.rowA;
+        int[] previous = scratch.rowB;
+        int[] current = scratch.rowC;
         for (int j = 0; j <= lb; j++) {
             previous[j] = j;
         }
@@ -311,8 +462,7 @@ public final class CommandFuzzy {
     }
 
     static String fold(String input) {
-        // command names are ascii nine times out of ten, and there NFKD changes nothing and
-        // there is no mark to drop, so an already lowercase name comes back without a copy
+
         if (isAscii(input)) {
             return input.toLowerCase(Locale.ROOT);
         }
@@ -332,7 +482,7 @@ public final class CommandFuzzy {
         while (first < folded.length() && Character.isLetterOrDigit(folded.charAt(first))) {
             first++;
         }
-        // nothing to strip: hand back the same string instead of copying it
+
         if (first == folded.length()) {
             return folded;
         }

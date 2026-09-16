@@ -1,7 +1,7 @@
 package com.rivalzin.bettersearch.client;
 
 import com.rivalzin.bettersearch.BetterSearch;
-import com.rivalzin.bettersearch.core.EntryBuilder;
+import com.rivalzin.bettersearch.async.EntrySnapshot;
 import com.rivalzin.bettersearch.core.SearchField;
 import com.rivalzin.bettersearch.core.SearchIndex;
 import com.rivalzin.bettersearch.core.SearchSettings;
@@ -13,41 +13,35 @@ import net.minecraft.world.item.ItemStack;
 import java.util.ArrayList;
 import java.util.List;
 
-// JEI hands out its own list order, keep the positions
 public final class JeiIndexBuilder {
     private JeiIndexBuilder() {
     }
 
-    public static SearchIndex<IIngredientListElementInfo<?>> build(List<IIngredientListElementInfo<?>> source,
+    public static java.util.function.Supplier<SearchIndex<IIngredientListElementInfo<?>>> prepare(List<IIngredientListElementInfo<?>> source,
                                                      LanguageTable languages,
                                                      SearchSettings settings,
                                                      Player player) {
-        long start = System.nanoTime();
         List<String> codes = CreativeIndexBuilder.activeCodes(languages, settings);
         boolean englishSearched = CreativeIndexBuilder.englishSearched(codes);
 
-        List<SearchIndex.Entry<IIngredientListElementInfo<?>>> entries = new ArrayList<>(source.size());
-        for (IIngredientListElementInfo<?> element : source) {
+        return EntrySnapshot.capture(source, element -> {
             try {
-                EntryBuilder<IIngredientListElementInfo<?>> builder = new EntryBuilder<>(element);
+                EntrySnapshot<IIngredientListElementInfo<?>> builder = new EntrySnapshot<>(element);
                 fill(builder, element, languages, codes, settings, player,
                         englishSearched);
                 if (!builder.isEmpty()) {
-                    entries.add(builder.build());
+                    return builder;
                 }
-            } catch (Throwable t) {
+            } catch (RuntimeException | LinkageError t) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
                 BetterSearch.LOGGER.debug("[{}] skipped JEI ingredient: {}",
                         BetterSearch.MOD_NAME, t.toString());
             }
-        }
-
-        BetterSearch.LOGGER.info("[{}] JEI index ready: {} of {} ingredients in {} ms",
-                BetterSearch.MOD_NAME, entries.size(), source.size(),
-                (System.nanoTime() - start) / 1_000_000);
-        return new SearchIndex<>(entries);
+            return null;
+        });
     }
 
-    private static <V> void fill(EntryBuilder<IIngredientListElementInfo<?>> builder,
+    private static <V> void fill(EntrySnapshot<IIngredientListElementInfo<?>> builder,
                                  IIngredientListElementInfo<V> element,
                                  LanguageTable languages,
                                  List<String> codes,

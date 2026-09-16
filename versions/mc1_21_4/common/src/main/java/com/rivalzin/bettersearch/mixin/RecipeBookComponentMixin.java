@@ -14,7 +14,7 @@ import java.util.List;
 
 @Mixin(RecipeBookComponent.class)
 public abstract class RecipeBookComponentMixin {
-    // the recipe book rebuilds its list here, after the search box changed
+
     @Inject(method = "tick", at = @At("HEAD"))
     private void bettersearch$prepareIndex(CallbackInfo ci) {
         RecipeSearch.prepare();

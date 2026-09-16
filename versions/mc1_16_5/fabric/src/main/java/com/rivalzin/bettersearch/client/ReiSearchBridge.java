@@ -1,7 +1,7 @@
 package com.rivalzin.bettersearch.client;
 
 import com.rivalzin.bettersearch.BetterSearch;
-import com.rivalzin.bettersearch.core.EntryBuilder;
+import com.rivalzin.bettersearch.async.EntrySnapshot;
 import com.rivalzin.bettersearch.core.SearchField;
 import com.rivalzin.bettersearch.core.SearchIndex;
 import com.rivalzin.bettersearch.core.SearchQuery;
@@ -21,14 +21,13 @@ import java.util.Set;
 public final class ReiSearchBridge {
     private static final String REI_SYNTAX = "#$";
 
-    // REI 5.x keeps the list it built and only rebuilds it when the box changes, so a
-    // settings change has to ask it again or the screen keeps showing the old answer
-    private static java.lang.ref.WeakReference<me.shedaniel.rei.gui.widget.EntryListWidget> listRef =
+    private static volatile java.lang.ref.WeakReference<me.shedaniel.rei.gui.widget.EntryListWidget> listRef =
             new java.lang.ref.WeakReference<>(null);
     private static volatile String lastQuery = "";
 
     static {
         BetterSearchClient.onSettingsApplied(ReiSearchBridge::searchAgain);
+        BetterSearchClient.onInvalidate(ReiSearchBridge::invalidate);
     }
 
     public static void remember(me.shedaniel.rei.gui.widget.EntryListWidget list, String query) {
@@ -44,20 +43,25 @@ public final class ReiSearchBridge {
             if (list != null) {
                 list.updateSearch(lastQuery, true);
             }
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
             BetterSearch.LOGGER.debug("[{}] REI list left as it was: {}",
                     BetterSearch.MOD_NAME, t.toString());
         }
     }
 
-    private static volatile SearchIndex<EntryStack> index;
-    private static volatile int indexedSize = -1;
-    private static volatile long indexedStamp = Long.MIN_VALUE;
+    private static final com.rivalzin.bettersearch.async.SourceSnapshot<EntryStack> SOURCES =
+            new com.rivalzin.bettersearch.async.SourceSnapshot<>();
+    private static final AsyncIndex<EntryStack> INDEX = new AsyncIndex<>("REI entries");
+
+    public static void invalidate() {
+        INDEX.invalidate();
+        SOURCES.clear();
+    }
 
     private ReiSearchBridge() {
     }
 
-    // REI 5.x on fabric: entries are raw EntryStack, no wrapper type yet
     public static List<EntryStack> search(String query, List<EntryStack> result,
                                           List<EntryStack> source) {
         try {
@@ -81,6 +85,11 @@ public final class ReiSearchBridge {
                 return null;
             }
 
+            if ((parsed.isBrowseOnly() || SearchQuery.isBrowsingByMod(query))
+                    && result != null && !result.isEmpty()) {
+                return null;
+            }
+
             List<EntryStack> ours = ready.search(parsed, settings);
             if (result == null || result.isEmpty()) {
                 return ours.isEmpty() ? null : Collections.unmodifiableList(new ArrayList<EntryStack>(ours));
@@ -99,69 +108,60 @@ public final class ReiSearchBridge {
                 Set<EntryStack> fromRei = new HashSet<EntryStack>(result);
                 joined.addAll(result);
                 for (EntryStack stack : ours) {
-                    if (!fromRei.contains(stack)) {
+                    if (fromRei.add(stack)) {
                         joined.add(stack);
                     }
                 }
             }
             return Collections.unmodifiableList(joined);
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
             BetterSearch.LOGGER.debug("[{}] REI search left untouched: {}",
                     BetterSearch.MOD_NAME, t.toString());
             return null;
         }
     }
 
-    // REI gives the list already filtered, so ours is merged in, not replacing
     private static SearchIndex<EntryStack> buildIndex(List<EntryStack> source,
                                                         SearchSettings settings) {
         long stamp = BetterSearchClient.languageStamp();
-        SearchIndex<EntryStack> current = index;
-        if (current != null && indexedSize == source.size() && indexedStamp == stamp) {
-            return current;
-        }
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null || minecraft.player == null) {
             return null;
         }
+        List<EntryStack> capturedSource = SOURCES.capture(source);
+        return INDEX.getPrepared(capturedSource, capturedSource.size(), stamp, () -> prepare(
+                capturedSource, settings.copy(), BetterSearchClient.languages(), minecraft.player),
+                ReiSearchBridge::searchAgain);
+    }
 
-        long started = System.nanoTime();
-        LanguageTable languages = BetterSearchClient.languages();
+    private static java.util.function.Supplier<SearchIndex<EntryStack>> prepare(List<EntryStack> source,
+            SearchSettings settings, LanguageTable languages, net.minecraft.world.entity.player.Player player) {
         List<String> codes = CreativeIndexBuilder.activeCodes(languages, settings);
         boolean englishHit = CreativeIndexBuilder.englishSearched(codes);
-
-        List<SearchIndex.Entry<EntryStack>> entries =
-                new ArrayList<SearchIndex.Entry<EntryStack>>(source.size());
-        for (EntryStack stack : source) {
+        return EntrySnapshot.capture(source, stack -> {
             try {
-                EntryBuilder<EntryStack> builder = new EntryBuilder<EntryStack>(stack);
+                EntrySnapshot<EntryStack> builder = new EntrySnapshot<>(stack);
                 ItemStack item = itemOf(stack);
                 if (item != null && !item.isEmpty()) {
                     CreativeIndexBuilder.fill(builder, item, languages, codes, settings,
-                            minecraft.player, englishHit);
+                            player, englishHit);
                 } else {
                     fillOther(builder, stack, settings);
                 }
                 if (!builder.isEmpty()) {
-                    entries.add(builder.build());
+                    return builder;
                 }
-            } catch (Throwable t) {
+            } catch (RuntimeException | LinkageError t) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
                 BetterSearch.LOGGER.debug("[{}] REI entry skipped in index: {}",
                         BetterSearch.MOD_NAME, t.toString());
             }
-        }
-
-        SearchIndex<EntryStack> built = new SearchIndex<EntryStack>(entries);
-        BetterSearch.LOGGER.info("[{}] REI index ready: {} of {} entries in {} ms",
-                BetterSearch.MOD_NAME, entries.size(), source.size(),
-                (System.nanoTime() - started) / 1000000);
-        index = built;
-        indexedSize = source.size();
-        indexedStamp = stamp;
-        return built;
+            return null;
+        });
     }
 
-    private static void fillOther(EntryBuilder<EntryStack> builder, EntryStack stack,
+    private static void fillOther(EntrySnapshot<EntryStack> builder, EntryStack stack,
                                        SearchSettings settings) {
         builder.add(stack.asFormattedText().getString(), SearchField.SOURCE_NATIVE);
 
@@ -180,7 +180,8 @@ public final class ReiSearchBridge {
     private static ItemStack itemOf(EntryStack stack) {
         try {
             return stack.getType() == EntryStack.Type.ITEM ? stack.getItemStack() : null;
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
             return null;
         }
     }

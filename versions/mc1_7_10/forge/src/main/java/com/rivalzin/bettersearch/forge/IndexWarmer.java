@@ -9,13 +9,13 @@ public final class IndexWarmer {
     private final boolean hasNei = cpw.mods.fml.common.Loader.isModLoaded("NotEnoughItems");
     private java.lang.reflect.Method installNei;
     private boolean neiFailed;
-    // NEI keeps the filtered list until the box changes, so a settings change has to ask it
-    // again or the panel keeps showing the answer from before
+
     private int appliedStamp = -1;
+    private int appliedGeneration = -1;
     private boolean pokeFailed;
 
     @SubscribeEvent
-    // big packs need a couple of seconds, warm it up before the first keystroke
+
     public void onTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) {
             return;
@@ -33,18 +33,22 @@ public final class IndexWarmer {
             return;
         }
         int stamp = com.rivalzin.bettersearch.client.ModConfig.stamp();
-        if (stamp == appliedStamp) {
+
+        int generation = com.rivalzin.bettersearch.client.CreativeSearch.generation();
+        if (stamp == appliedStamp && generation == appliedGeneration) {
             return;
         }
         boolean first = appliedStamp < 0;
         appliedStamp = stamp;
+        appliedGeneration = generation;
         if (first) {
             return;
         }
         try {
             Object task = Class.forName("codechicken.nei.ItemList").getField("updateFilter").get(null);
             task.getClass().getMethod("restart").invoke(task);
-        } catch (Throwable t) {
+        } catch (Exception | LinkageError t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
             pokeFailed = true;
             com.rivalzin.bettersearch.BetterSearch.LOGGER.debug(
                     "[{}] could not ask NEI to filter again: {}",
@@ -62,7 +66,8 @@ public final class IndexWarmer {
                         .getMethod("install");
             }
             installNei.invoke(null);
-        } catch (Throwable t) {
+        } catch (Exception | LinkageError t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
             neiFailed = true;
             com.rivalzin.bettersearch.BetterSearch.LOGGER.warn(
                     "[{}] could not hook NEI: {}",

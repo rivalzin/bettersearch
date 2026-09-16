@@ -6,6 +6,7 @@
   "refmap": "bettersearch.refmap.json",
   "client": [
     "CreativeModeInventoryScreenMixin",
+    "CreativeScreenAccessor",
     "RecipeBookComponentMixin",
     "CommandSuggestionsMixin",
     "ChatScreenMixin",

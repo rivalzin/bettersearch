@@ -13,7 +13,6 @@ final class AltKeyMapping extends KeyMapping {
     public Component getTranslatedKeyMessage() {
         Component key = super.getTranslatedKeyMessage();
 
-        // the Alt belongs to the default key, so the label stops claiming it once moved
         return isDefault()
                 ? Component.translatable("bettersearch.key.alt", key)
                 : key;

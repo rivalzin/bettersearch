@@ -5,7 +5,9 @@ import com.google.gson.stream.JsonToken;
 import com.rivalzin.bettersearch.BetterSearch;
 import com.rivalzin.bettersearch.core.SearchSettings;
 import net.minecraft.resources.Identifier;
-import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.PackResources;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.resources.IoSupplier;
 import net.minecraft.server.packs.resources.ResourceManager;
 
 import java.io.InputStream;
@@ -29,12 +31,11 @@ public final class LanguageTable {
     private final Set<String> requested;
 
     private LanguageTable(Map<String, Map<String, String>> byLanguage, List<String> order, Set<String> requested) {
-        this.byLanguage = byLanguage;
-        this.order = order;
-        this.requested = requested;
+        this.byLanguage = java.util.Collections.unmodifiableMap(byLanguage);
+        this.order = java.util.Collections.unmodifiableList(new ArrayList<>(order));
+        this.requested = java.util.Collections.unmodifiableSet(new LinkedHashSet<>(requested));
     }
 
-    // a star means every language the packs ship
     public static Set<String> requestFor(SearchSettings settings) {
         if (!settings.crossLanguage) {
             return Set.of();
@@ -62,7 +63,6 @@ public final class LanguageTable {
         return byLanguage.isEmpty();
     }
 
-
     public static LanguageTable load(ResourceManager resourceManager, SearchSettings settings) {
         if (!settings.crossLanguage) {
             return EMPTY;
@@ -77,27 +77,39 @@ public final class LanguageTable {
             }
         }
 
-        Map<Identifier, List<Resource>> available;
-        try {
-            available = resourceManager.listResourceStacks("lang", path -> path.getPath().endsWith(".json"));
-        } catch (Exception e) {
-            BetterSearch.LOGGER.warn("[{}] could not list language files",
-                    BetterSearch.MOD_NAME, e);
-            return new LanguageTable(Map.of(), List.of(), request);
-        }
+        Map<Identifier, List<IoSupplier<InputStream>>> available = new LinkedHashMap<>();
+        resourceManager.listPacks().forEach(pack -> {
+            try {
+                for (String namespace : pack.getNamespaces(PackType.CLIENT_RESOURCES)) {
+                    pack.listResources(PackType.CLIENT_RESOURCES, namespace, "lang",
+                            (location, supplier) -> {
+                                String code = languageCodeOf(location.getPath());
+                                if (code != null && (wanted == null || wanted.contains(code))) {
+                                    available.computeIfAbsent(location, unused -> new ArrayList<>())
+                                            .add(supplier);
+                                }
+                            });
+                }
+            } catch (Exception t) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
+                BetterSearch.LOGGER.warn("[{}] resource pack '{}' failed while listing languages, skipping it: {}",
+                        BetterSearch.MOD_NAME, safeId(pack), t.toString());
+            }
+        });
 
         Map<String, Map<String, String>> result = new LinkedHashMap<>();
-        for (Map.Entry<Identifier, List<Resource>> entry : available.entrySet()) {
+        for (Map.Entry<Identifier, List<IoSupplier<InputStream>>> entry : available.entrySet()) {
             String code = languageCodeOf(entry.getKey().getPath());
             if (code == null || (wanted != null && !wanted.contains(code))) {
                 continue;
             }
             Map<String, String> translations = result.computeIfAbsent(code, unused -> new HashMap<>(2048));
             try {
-                for (Resource resource : entry.getValue()) {
+                for (IoSupplier<InputStream> resource : entry.getValue()) {
                     readInto(resource, translations);
                 }
             } catch (Exception e) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(e);
                 BetterSearch.LOGGER.debug("[{}] language pack skipped ({}): {}",
                         BetterSearch.MOD_NAME, entry.getKey(), e.toString());
             }
@@ -129,8 +141,8 @@ public final class LanguageTable {
         return code.isEmpty() ? null : code;
     }
 
-    private static void readInto(Resource resource, Map<String, String> out) {
-        try (InputStream in = resource.open();
+    private static void readInto(IoSupplier<InputStream> resource, Map<String, String> out) {
+        try (InputStream in = resource.get();
              Reader charReader = new InputStreamReader(in, StandardCharsets.UTF_8);
              JsonReader json = new JsonReader(charReader)) {
             json.setLenient(true);
@@ -144,19 +156,29 @@ public final class LanguageTable {
                     json.skipValue();
                     continue;
                 }
-                String value = json.nextString();
                 if (isInteresting(key)) {
-                    out.put(key, value);
+                    out.put(key, json.nextString());
+                } else {
+                    json.skipValue();
                 }
             }
             json.endObject();
         } catch (Exception e) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(e);
             BetterSearch.LOGGER.debug("[{}] skipped language file: {}", BetterSearch.MOD_NAME, e.toString());
         }
     }
 
-    // only item and block keys, the rest of the lang file is noise here
     private static boolean isInteresting(String key) {
         return key.startsWith("item.") || key.startsWith("block.");
+    }
+
+    private static String safeId(PackResources pack) {
+        try {
+            return pack.packId();
+        } catch (Exception t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
+            return pack.getClass().getName();
+        }
     }
 }

@@ -1,7 +1,7 @@
 package com.rivalzin.bettersearch.client;
 
 import com.rivalzin.bettersearch.BetterSearch;
-import com.rivalzin.bettersearch.core.EntryBuilder;
+import com.rivalzin.bettersearch.async.EntrySnapshot;
 import com.rivalzin.bettersearch.core.SearchField;
 import com.rivalzin.bettersearch.core.SearchIndex;
 import com.rivalzin.bettersearch.core.SearchSettings;
@@ -17,43 +17,40 @@ import net.minecraft.world.item.ItemStack;
 import java.util.ArrayList;
 import java.util.List;
 
-// JEI hands out its own list order, keep the positions
 public final class JeiIndexBuilder {
     private JeiIndexBuilder() {
     }
 
-    public static SearchIndex<IListElement<?>> build(List<IListElement<?>> source,
+    public static java.util.function.Supplier<SearchIndex<IListElement<?>>> prepare(List<?> source,
                                                      IIngredientManager manager,
                                                      LanguageTable languages,
                                                      SearchSettings settings,
                                                      Item.TooltipContext tooltipContext,
                                                      Player player) {
-        long start = System.nanoTime();
         List<String> codes = CreativeIndexBuilder.activeCodes(languages, settings);
         boolean englishSearched = CreativeIndexBuilder.englishSearched(codes);
 
-        List<SearchIndex.Entry<IListElement<?>>> entries = new ArrayList<>(source.size());
-        for (IListElement<?> element : source) {
+        return EntrySnapshot.capture(source, raw -> {
+            if (!(raw instanceof IListElement<?> element)) {
+                return null;
+            }
             try {
-                EntryBuilder<IListElement<?>> builder = new EntryBuilder<>(element);
+                EntrySnapshot<IListElement<?>> builder = new EntrySnapshot<>(element);
                 fill(builder, element, manager, languages, codes, settings, tooltipContext, player,
                         englishSearched);
                 if (!builder.isEmpty()) {
-                    entries.add(builder.build());
+                    return builder;
                 }
-            } catch (Throwable t) {
+            } catch (RuntimeException | LinkageError t) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
                 BetterSearch.LOGGER.debug("[{}] skipped JEI ingredient: {}",
                         BetterSearch.MOD_NAME, t.toString());
             }
-        }
-
-        BetterSearch.LOGGER.info("[{}] JEI index ready: {} of {} ingredients in {} ms",
-                BetterSearch.MOD_NAME, entries.size(), source.size(),
-                (System.nanoTime() - start) / 1_000_000);
-        return new SearchIndex<>(entries);
+            return null;
+        });
     }
 
-    private static <V> void fill(EntryBuilder<IListElement<?>> builder,
+    private static <V> void fill(EntrySnapshot<IListElement<?>> builder,
                                  IListElement<V> element,
                                  IIngredientManager manager,
                                  LanguageTable languages,

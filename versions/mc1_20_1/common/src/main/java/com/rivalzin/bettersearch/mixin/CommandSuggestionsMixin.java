@@ -18,6 +18,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BooleanSupplier;
 
 @Mixin(CommandSuggestions.class)
 public abstract class CommandSuggestionsMixin {
@@ -38,7 +39,9 @@ public abstract class CommandSuggestionsMixin {
     @Unique
     private CompletableFuture<Suggestions> bettersearch$lastAugmented;
 
-    // vanilla builds the suggestion list here, we only add to it
+    @Unique
+    private long bettersearch$requestVersion;
+
     @Inject(method = "updateCommandInfo", at = @At("RETURN"))
     private void bettersearch$augmentSuggestions(CallbackInfo ci) {
         CompletableFuture<Suggestions> pending = this.pendingSuggestions;
@@ -49,20 +52,32 @@ public abstract class CommandSuggestionsMixin {
         final String text = this.input.getValue();
         final int cursor = this.input.getCursorPosition();
 
-        this.pendingSuggestions = pending.thenCompose(suggestions -> parse != null
-                ? CommandSearch.augmentCommandAsync(parse, cursor, suggestions)
-                : CompletableFuture.completedFuture(CommandSearch.augmentChat(text, cursor, suggestions)));
-        this.bettersearch$lastAugmented = this.pendingSuggestions;
+        final long requestVersion = ++this.bettersearch$requestVersion;
+        final net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
+        final net.minecraft.client.gui.screens.Screen screen = minecraft.screen;
+        BooleanSupplier isCurrent = () -> this.bettersearch$requestVersion == requestVersion
+                && this.currentParse == parse && this.input.getValue().equals(text)
+                && this.input.getCursorPosition() == cursor && minecraft.screen == screen
+                && CommandSearch.isEnabled();
+        CompletableFuture<Suggestions> augmented = pending.thenComposeAsync(suggestions -> {
+            if (!isCurrent.getAsBoolean()) {
+                return CompletableFuture.completedFuture(suggestions);
+            }
+            return parse != null
+                    ? CommandSearch.augmentCommandAsync(parse, cursor, suggestions, isCurrent)
+                    : CompletableFuture.completedFuture(CommandSearch.augmentChat(text, cursor, suggestions));
+        }, minecraft);
+        this.pendingSuggestions = augmented;
+        this.bettersearch$lastAugmented = augmented;
 
         if (parse != null) {
-            this.pendingSuggestions.thenRun(() -> {
-                if (this.pendingSuggestions.isDone()) {
+            augmented.thenAcceptAsync(result -> {
+                if (this.pendingSuggestions == augmented && isCurrent.getAsBoolean()) {
                     this.updateUsageInfo();
                 }
-            });
+            }, minecraft);
         }
     }
-
     @Redirect(
             method = "formatText",
             at = @At(

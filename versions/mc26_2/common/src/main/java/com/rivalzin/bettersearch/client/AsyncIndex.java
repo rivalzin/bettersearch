@@ -1,105 +1,52 @@
 package com.rivalzin.bettersearch.client;
 
 import com.rivalzin.bettersearch.BetterSearch;
+import com.rivalzin.bettersearch.async.AsyncIndexState;
 import com.rivalzin.bettersearch.core.SearchIndex;
 import net.minecraft.util.Util;
 import net.minecraft.client.Minecraft;
 
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
-// built off-thread, swapped in whole - readers never see a half index
 public final class AsyncIndex<T> {
-    private final String name;
-
-    private volatile SearchIndex<T> index;
-    private volatile Object readySource;
-    private volatile int readySize = -1;
-    private volatile long readyStamp = Long.MIN_VALUE;
-
-    private volatile Object pendingSource;
-    private volatile int pendingSize = -1;
-    private volatile long pendingStamp = Long.MIN_VALUE;
-
-    private volatile boolean building;
-    private volatile boolean failed;
+    private final AsyncIndexState<SearchIndex<T>> state;
 
     public AsyncIndex(String name) {
-        this.name = name;
+        state = new AsyncIndexState<>(task -> Minecraft.getInstance().execute(task),
+                task -> Util.backgroundExecutor().execute(task),
+                task -> Minecraft.getInstance().execute(task),
+                error -> BetterSearch.LOGGER.error("[{}] failed to build {} index",
+                        BetterSearch.MOD_NAME, name, error));
+    }
+
+    public SearchIndex<T> ready(Object source, int size, long stamp) {
+        return state.ready(source, size, stamp);
+    }
+
+    public SearchIndex<T> peek() {
+        return state.peek();
     }
 
     public SearchIndex<T> get(Object source, int size, long stamp, Supplier<SearchIndex<T>> build) {
         return get(source, size, stamp, build, null);
     }
 
-    public SearchIndex<T> ready(Object source, int size, long stamp) {
-        SearchIndex<T> current = index;
-        if (current != null && readySource == source && readySize == size && readyStamp == stamp) {
-            return current;
-        }
-        return null;
-    }
-
     public SearchIndex<T> get(Object source, int size, long stamp, Supplier<SearchIndex<T>> build,
                               Runnable onReady) {
-        SearchIndex<T> current = index;
-        if (current != null && readySource == source && readySize == size && readyStamp == stamp) {
-            return current;
-        }
-        if (failed) {
-            return null;
-        }
-        if (!building && (pendingSource != source || pendingSize != size || pendingStamp != stamp)) {
-            start(source, size, stamp, build, onReady);
-        }
-        return null;
+        return state.get(source, size, stamp, build, onReady);
     }
 
-    private synchronized void start(Object source, int size, long stamp, Supplier<SearchIndex<T>> build,
-                                    Runnable onReady) {
-        if (building || (pendingSource == source && pendingSize == size && pendingStamp == stamp)) {
-            return;
-        }
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft == null) {
-            return;
-        }
-        building = true;
-        pendingSource = source;
-        pendingSize = size;
-        pendingStamp = stamp;
-
-        CompletableFuture
-                .supplyAsync(build, Util.backgroundExecutor())
-                .whenComplete((built, error) -> minecraft.execute(() -> {
-                    building = false;
-                    if (error != null) {
-                        BetterSearch.LOGGER.error("[{}] failed to build {} index",
-                                BetterSearch.MOD_NAME, name, error);
-                        failed = true;
-                        return;
-                    }
-                    index = built;
-                    readySource = pendingSource;
-                    readySize = pendingSize;
-                    readyStamp = pendingStamp;
-                    if (onReady != null) {
-                        onReady.run();
-                    }
-                }));
+    public SearchIndex<T> getPrepared(Object source, int size, long stamp,
+                                     Supplier<Supplier<SearchIndex<T>>> prepare, Runnable onReady) {
+        return state.getPrepared(source, size, stamp, prepare, onReady);
     }
 
-    // drops the index, the next search rebuilds it
+    public SearchIndex<T> getPrepared(Object source, int size, long stamp,
+                                     Supplier<Supplier<SearchIndex<T>>> prepare) {
+        return getPrepared(source, size, stamp, prepare, null);
+    }
+
     public void invalidate() {
-        // failed too, or one build failure keeps the index off all session
-        failed = false;
-        index = null;
-        readySource = null;
-        readySize = -1;
-        readyStamp = Long.MIN_VALUE;
-
-        pendingSource = null;
-        pendingSize = -1;
-        pendingStamp = Long.MIN_VALUE;
+        state.invalidate();
     }
 }

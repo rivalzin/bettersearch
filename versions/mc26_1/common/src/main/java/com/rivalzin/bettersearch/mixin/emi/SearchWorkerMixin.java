@@ -28,6 +28,10 @@ public abstract class SearchWorkerMixin {
             index = 1,
             require = 0)
     private List<? extends EmiIngredient> bettersearch$augment(List<? extends EmiIngredient> result) {
+
+        if (Thread.currentThread() != dev.emi.emi.search.EmiSearch.searchThread) {
+            return result;
+        }
         List<? extends EmiIngredient> ours = EmiSearchBridge.search(query, result, source);
         return ours == null ? result : ours;
     }

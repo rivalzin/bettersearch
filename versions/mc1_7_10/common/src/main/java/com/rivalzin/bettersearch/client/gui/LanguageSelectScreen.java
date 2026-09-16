@@ -1,5 +1,6 @@
 package com.rivalzin.bettersearch.client.gui;
 
+import com.rivalzin.bettersearch.client.ModConfig;
 import com.rivalzin.bettersearch.client.LanguageCatalog;
 import com.rivalzin.bettersearch.core.SearchSettings;
 import com.rivalzin.bettersearch.core.TextNormalizer;
@@ -10,7 +11,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-// the list is what the resource packs actually ship, not a hardcoded table
 public final class LanguageSelectScreen extends OptionRowsScreen {
     private final SearchSettings settings;
     private final List<LanguageCatalog.Entry> languages;
@@ -65,6 +65,8 @@ public final class LanguageSelectScreen extends OptionRowsScreen {
         int y = panelFooterTop() + 4;
 
         if (searchBox == null) {
+
+            org.lwjgl.input.Keyboard.enableRepeatEvents(true);
             searchBox = new GuiTextField(this.fontRendererObj, x, y, width, BUTTON_HEIGHT);
             searchBox.setMaxStringLength(32);
             searchBox.setFocused(true);
@@ -173,7 +175,8 @@ public final class LanguageSelectScreen extends OptionRowsScreen {
         }
         if (enabled) {
             if (!LanguageCatalog.contains(settings.languages, code)) {
-                settings.languages.add(code);
+
+                settings.languages.add(code.toLowerCase(java.util.Locale.ROOT));
             }
         } else {
             Iterator<String> it = settings.languages.iterator();
@@ -191,5 +194,12 @@ public final class LanguageSelectScreen extends OptionRowsScreen {
             all.add(language.code());
         }
         return all;
+    }
+
+    @Override
+    public void onGuiClosed() {
+        ModConfig.apply(settings);
+        org.lwjgl.input.Keyboard.enableRepeatEvents(false);
+        super.onGuiClosed();
     }
 }

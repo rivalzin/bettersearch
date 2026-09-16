@@ -8,6 +8,9 @@ public final class NeiIntegrationLegacy {
     }
 
     public static void install() {
+
+        codechicken.nei.api.GuiInfo.customSlotGuis
+                .add(com.rivalzin.bettersearch.client.SearchableCreativeScreen.class);
         API.addSearchProvider(new NeiSearchProviderLegacy());
         BetterSearch.LOGGER.info("[{}] hooked into legacy NEI as a secondary provider",
                 BetterSearch.MOD_NAME);

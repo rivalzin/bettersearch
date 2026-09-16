@@ -1,7 +1,7 @@
 package com.rivalzin.bettersearch.client;
 
 import com.rivalzin.bettersearch.BetterSearch;
-import com.rivalzin.bettersearch.core.EntryBuilder;
+import com.rivalzin.bettersearch.async.EntrySnapshot;
 import com.rivalzin.bettersearch.core.SearchField;
 import com.rivalzin.bettersearch.core.SearchIndex;
 import com.rivalzin.bettersearch.core.SearchQuery;
@@ -23,18 +23,18 @@ import java.util.Set;
 public final class EmiSearchBridge {
     private static final String EMI_SYNTAX = "#$/|";
 
-    private static final Object BUILD_LOCK = new Object();
-
-    private static volatile SearchIndex<EmiIngredient> index;
-    private static volatile int indexedSize = -1;
-    // EMI caches its own list, rebuild when the settings stamp moves
-    private static volatile long indexedStamp = Long.MIN_VALUE;
+    private static final com.rivalzin.bettersearch.async.SourceSnapshot<EmiIngredient> SOURCES =
+            new com.rivalzin.bettersearch.async.SourceSnapshot<>();
+    private static final AsyncIndex<EmiIngredient> INDEX = new AsyncIndex<>("EMI ingredients");
 
     static {
+
+        BetterSearchClient.onInvalidate(EmiSearchBridge::invalidate);
         BetterSearchClient.onSettingsApplied(() -> {
             try {
                 EmiSearch.update();
-            } catch (Throwable ignored) {
+            } catch (RuntimeException | LinkageError ignored) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(ignored);
             }
         });
     }
@@ -43,9 +43,8 @@ public final class EmiSearchBridge {
     }
 
     public static void invalidate() {
-        index = null;
-        indexedSize = -1;
-        indexedStamp = Long.MIN_VALUE;
+        INDEX.invalidate();
+        SOURCES.clear();
     }
 
     public static List<? extends EmiIngredient> search(String query,
@@ -72,6 +71,11 @@ public final class EmiSearchBridge {
                 return null;
             }
 
+            if ((parsed.isBrowseOnly() || SearchQuery.isBrowsingByMod(query))
+                    && result != null && !result.isEmpty()) {
+                return null;
+            }
+
             List<EmiIngredient> ours = ready.search(parsed, settings);
             if (result == null || result.isEmpty()) {
                 return ours.isEmpty() ? null : List.copyOf(ours);
@@ -90,13 +94,15 @@ public final class EmiSearchBridge {
                 Set<EmiIngredient> fromEmi = new HashSet<>(result);
                 merged.addAll(result);
                 for (EmiIngredient ingredient : ours) {
-                    if (!fromEmi.contains(ingredient)) {
+                    if (fromEmi.add(ingredient)) {
                         merged.add(ingredient);
                     }
                 }
             }
-            return List.copyOf(merged);
-        } catch (Throwable t) {
+
+            return merged;
+        } catch (RuntimeException | LinkageError t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
             BetterSearch.LOGGER.debug("[{}] EMI search left untouched: {}",
                     BetterSearch.MOD_NAME, t.toString());
             return null;
@@ -106,38 +112,32 @@ public final class EmiSearchBridge {
     private static SearchIndex<EmiIngredient> ensureIndex(List<? extends EmiIngredient> source,
                                                           SearchSettings settings) {
         long stamp = BetterSearchClient.languageStamp();
-        SearchIndex<EmiIngredient> current = index;
-        if (current != null && indexedSize == source.size() && indexedStamp == stamp) {
-            return current;
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null || minecraft.player == null) {
+            return null;
         }
-        // EMI starts a thread per keystroke and lets the old ones run on, so without this
-        // four of them would build the very same index at the same time
-        synchronized (BUILD_LOCK) {
-            current = index;
-            if (current != null && indexedSize == source.size() && indexedStamp == stamp) {
-                return current;
-            }
-            return buildIndex(source, settings, stamp);
-        }
+        List<EmiIngredient> capturedSource = SOURCES.capture(source);
+        return INDEX.getPrepared(capturedSource, capturedSource.size(), stamp, () -> {
+            SearchSettings captured = settings.copy();
+            return prepare(capturedSource, captured);
+        }, () -> EmiSearch.update());
     }
 
-    private static SearchIndex<EmiIngredient> buildIndex(List<? extends EmiIngredient> source,
-                                                         SearchSettings settings, long stamp) {
+    private static java.util.function.Supplier<SearchIndex<EmiIngredient>> prepare(List<? extends EmiIngredient> source,
+                                                         SearchSettings settings) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null || minecraft.player == null) {
             return null;
         }
 
-        long start = System.nanoTime();
         LanguageTable languages = BetterSearchClient.languages();
         List<String> codes = CreativeIndexBuilder.activeCodes(languages, settings);
         boolean englishSearched = CreativeIndexBuilder.englishSearched(codes);
         Item.TooltipContext tooltipContext = Item.TooltipContext.of(minecraft.level);
 
-        List<SearchIndex.Entry<EmiIngredient>> entries = new ArrayList<>(source.size());
-        for (EmiIngredient ingredient : source) {
+        return EntrySnapshot.capture(source, ingredient -> {
             try {
-                EntryBuilder<EmiIngredient> builder = new EntryBuilder<>(ingredient);
+                EntrySnapshot<EmiIngredient> builder = new EntrySnapshot<>(ingredient);
                 ItemStack stack = stackOf(ingredient);
                 if (stack != null && !stack.isEmpty()) {
                     CreativeIndexBuilder.fill(builder, stack, languages, codes, settings,
@@ -146,26 +146,18 @@ public final class EmiSearchBridge {
                     fillOther(builder, ingredient, settings);
                 }
                 if (!builder.isEmpty()) {
-                    entries.add(builder.build());
+                    return builder;
                 }
-            } catch (Throwable t) {
+            } catch (RuntimeException | LinkageError t) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
                 BetterSearch.LOGGER.debug("[{}] skipped EMI ingredient: {}",
                         BetterSearch.MOD_NAME, t.toString());
             }
-        }
-
-        SearchIndex<EmiIngredient> built = new SearchIndex<>(entries);
-        BetterSearch.LOGGER.info("[{}] EMI index ready: {} of {} ingredients in {} ms",
-                BetterSearch.MOD_NAME, entries.size(), source.size(),
-                (System.nanoTime() - start) / 1_000_000);
-        indexedSize = source.size();
-        indexedStamp = stamp;
-        // published last, so whoever sees this index also sees the size and stamp behind it
-        index = built;
-        return built;
+            return null;
+        });
     }
 
-    private static void fillOther(EntryBuilder<EmiIngredient> builder, EmiIngredient ingredient,
+    private static void fillOther(EntrySnapshot<EmiIngredient> builder, EmiIngredient ingredient,
                                   SearchSettings settings) {
         List<EmiStack> stacks = ingredient.getEmiStacks();
         if (stacks.isEmpty()) {
@@ -173,17 +165,17 @@ public final class EmiSearchBridge {
         }
         builder.add(stacks.get(0).getName().getString(), SearchField.SOURCE_NATIVE);
 
-        // id from the ItemStack: EmiStack.getId() returns the old ResourceLocation here
-        ItemStack stack = stackOf(ingredient);
-        if (stack != null && !stack.isEmpty()) {
-            Identifier id = BuiltInRegistries.ITEM.getKey(stack.getItem());
-            if (id != null) {
-                builder.modId(id.getNamespace());
-                builder.family(id.getPath());
-                if (settings.searchItemIds) {
-                    builder.add(id.getNamespace() + ' ' + id.getPath().replace('_', ' '),
-                            SearchField.SOURCE_ID);
-                }
+        Object key = stacks.get(0).getKey();
+        Identifier id = key instanceof Item item ? BuiltInRegistries.ITEM.getKey(item)
+                : key instanceof net.minecraft.world.level.material.Fluid fluid
+                        ? BuiltInRegistries.FLUID.getKey(fluid)
+                        : null;
+        if (id != null) {
+            builder.modId(id.getNamespace());
+            builder.family(id.getPath());
+            if (settings.searchItemIds) {
+                builder.add(id.getNamespace() + ' ' + id.getPath().replace('_', ' '),
+                        SearchField.SOURCE_ID);
             }
         }
     }
@@ -192,7 +184,8 @@ public final class EmiSearchBridge {
         try {
             List<EmiStack> stacks = ingredient.getEmiStacks();
             return stacks.isEmpty() ? null : stacks.get(0).getItemStack();
-        } catch (Throwable t) {
+        } catch (RuntimeException | LinkageError t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
             return null;
         }
     }

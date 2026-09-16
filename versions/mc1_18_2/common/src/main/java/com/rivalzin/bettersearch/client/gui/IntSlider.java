@@ -8,7 +8,6 @@ import java.util.function.IntFunction;
 
 import net.minecraft.network.chat.Component;
 
-// value is stepped, the vanilla slider is 0..1 doubles
 public final class IntSlider extends AbstractSliderButton {
     private final int min;
     private final int max;

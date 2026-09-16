@@ -20,6 +20,13 @@ import java.util.function.IntFunction;
 import java.util.function.IntSupplier;
 
 public abstract class OptionRowsScreen extends Screen {
+
+    private boolean rebuildQueued;
+
+    protected final void deferRebuild() {
+        rebuildQueued = true;
+    }
+
     protected static final String KEY_PREFIX = "bettersearch.config.";
 
     protected static final int ROW_HEIGHT = 24;
@@ -102,7 +109,6 @@ public abstract class OptionRowsScreen extends Screen {
 
     protected abstract void buildRows();
 
-    // footer is pinned to the bottom, the list scrolls under it
     protected abstract void buildPanelFooter();
 
     protected abstract Component panelDefaultTitle();
@@ -123,7 +129,7 @@ public abstract class OptionRowsScreen extends Screen {
         panelX = this.width - MARGIN - panelWidth;
         listX = MARGIN;
         listWidth = panelX - MARGIN - listX;
-        // the last pixels are the scrollbar's, not the reset arrow's
+
         barWidth = listWidth - RESET_SIZE - 4 - SCROLLBAR_GUTTER;
         sliderWidth = Mth.clamp(barWidth * 45 / 100, 60, SLIDER_WIDTH_MAX);
         listBottom = contentBottom - listBottomInset();
@@ -179,9 +185,6 @@ public abstract class OptionRowsScreen extends Screen {
     protected final int panelWidth() {
         return panelWidth;
     }
-
-
-
 
     private int controlX(int width) {
         return listX + barWidth - 6 - width;
@@ -239,7 +242,7 @@ public abstract class OptionRowsScreen extends Screen {
         if (onReset != null) {
             reset = Button.builder(Component.literal("↺"), b -> {
                 onReset.run();
-                rebuildWidgets();
+                deferRebuild();
             }).bounds(listX + barWidth + 4, 0, RESET_SIZE, RESET_SIZE)
                     .tooltip(Tooltip.create(Component.translatable(KEY_PREFIX + "reset_option")))
                     .build();
@@ -404,6 +407,10 @@ public abstract class OptionRowsScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        if (rebuildQueued) {
+            rebuildQueued = false;
+            rebuildWidgets();
+        }
         updateHoveredRow(mouseX, mouseY);
         for (Row row : rows) {
             if (row.reset != null && row.modified != null) {
@@ -420,7 +427,6 @@ public abstract class OptionRowsScreen extends Screen {
     protected void updateFooterState() {
     }
 
-    // hover drives the preview, so it is tracked even when nothing is clicked
     private void updateHoveredRow(int mouseX, int mouseY) {
         hoveredRow = null;
         if (mouseX >= listX && mouseX <= listX + listWidth) {
@@ -527,7 +533,6 @@ public abstract class OptionRowsScreen extends Screen {
         return top;
     }
 
-    // hand rolled: the vanilla scrollbar widget only exists from 1.20 on
     private void renderScrollbar(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         if (maxScroll() <= 0) {
             return;

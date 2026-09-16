@@ -3,7 +3,7 @@ package com.rivalzin.bettersearch;
 import java.lang.reflect.Method;
 
 public final class Log {
-    // log4j on the old versions, slf4j on the new ones, System.out on neither
+
     private static final String[][] BACKENDS = {
             {"org.apache.logging.log4j.LogManager", "org.apache.logging.log4j.Logger"},
             {"org.slf4j.LoggerFactory", "org.slf4j.Logger"},
@@ -43,7 +43,8 @@ public final class Log {
                         type.getMethod("warn", String.class, Object[].class),
                         type.getMethod("error", String.class, Object[].class),
                         type.getMethod("isDebugEnabled"));
-            } catch (Throwable ignored) {
+            } catch (Exception | LinkageError ignored) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(ignored);
             }
         }
         return new Log(name, null, null, null, null, null, null);
@@ -59,7 +60,8 @@ public final class Log {
         }
         try {
             return Boolean.TRUE.equals(mDebugEnabled.invoke(target));
-        } catch (Throwable e) {
+        } catch (Exception | LinkageError e) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(e);
             return false;
         }
     }
@@ -88,7 +90,8 @@ public final class Log {
             try {
                 method.invoke(target, msg, args == null ? new Object[0] : args);
                 return;
-            } catch (Throwable e) {
+            } catch (Exception | LinkageError e) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(e);
             }
         }
         System.out.println("[" + name + "/" + level + "] " + format(msg, args));

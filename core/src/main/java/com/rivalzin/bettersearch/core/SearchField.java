@@ -1,6 +1,5 @@
 package com.rivalzin.bettersearch.core;
 
-// id, tooltip and the language fields each score separately
 public final class SearchField {
     public static final byte SOURCE_NATIVE = 0;
 
@@ -16,7 +15,7 @@ public final class SearchField {
 
     public final long mask;
 
-    public final int[] wordStarts;
+    private final int[] wordStarts;
 
     public final String initials;
 
@@ -77,6 +76,10 @@ public final class SearchField {
 
     public int wordCount() {
         return wordStarts.length;
+    }
+
+    public int wordStart(int index) {
+        return wordStarts[index];
     }
 
     @Override

@@ -1,7 +1,13 @@
 package com.rivalzin.bettersearch.core;
 
-// one object per pass: what a pass is allowed to do is decided before it starts
 public final class MatchPolicy {
+    private static final MatchPolicy[] POLICIES = new MatchPolicy[8];
+
+    static {
+        for (int i = 0; i < POLICIES.length; i++) {
+            POLICIES[i] = new MatchPolicy((i & 1) != 0, (i & 2) != 0, (i & 4) != 0);
+        }
+    }
     private final boolean allowTypos;
     private final boolean allowInitials;
     private final boolean allowCompact;
@@ -25,6 +31,6 @@ public final class MatchPolicy {
     }
 
     public static MatchPolicy of(SearchSettings settings, boolean allowTypos) {
-        return new MatchPolicy(allowTypos, settings.matchInitials, settings.ignoreSpaces);
+        return POLICIES[(allowTypos ? 1 : 0) | (settings.matchInitials ? 2 : 0) | (settings.ignoreSpaces ? 4 : 0)];
     }
 }

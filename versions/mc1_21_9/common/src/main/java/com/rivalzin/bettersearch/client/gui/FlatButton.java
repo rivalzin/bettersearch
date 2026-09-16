@@ -8,7 +8,6 @@ import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
-// no vanilla button texture: this one is flat so it looks the same on every version
 public final class FlatButton extends AbstractWidget {
     private static final int BACKGROUND = 0x66000000;
     private static final int BACKGROUND_HOVER = 0xAA000000;
@@ -25,13 +24,24 @@ public final class FlatButton extends AbstractWidget {
     }
 
     @Override
+    public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+
+        if (this.active && this.visible && event.isSelection()) {
+            playDownSound(net.minecraft.client.Minecraft.getInstance().getSoundManager());
+            onPress.run();
+            return true;
+        }
+        return false;
+    }
+
+    @Override
     public void onClick(MouseButtonEvent event, boolean isDoubleClick) {
         onPress.run();
     }
 
     @Override
     protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        boolean highlight = isHovered() && this.active;
+        boolean highlight = (isHovered() || isFocused()) && this.active;
         guiGraphics.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(),
                 highlight ? BACKGROUND_HOVER : BACKGROUND);
         guiGraphics.drawCenteredString(Minecraft.getInstance().font, getMessage(),

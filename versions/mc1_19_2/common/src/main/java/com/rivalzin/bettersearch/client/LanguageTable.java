@@ -29,12 +29,11 @@ public final class LanguageTable {
     private final Set<String> requested;
 
     private LanguageTable(Map<String, Map<String, String>> byLanguage, List<String> order, Set<String> requested) {
-        this.byLanguage = byLanguage;
-        this.order = order;
-        this.requested = requested;
+        this.byLanguage = java.util.Collections.unmodifiableMap(byLanguage);
+        this.order = java.util.Collections.unmodifiableList(new ArrayList<>(order));
+        this.requested = java.util.Collections.unmodifiableSet(new LinkedHashSet<>(requested));
     }
 
-    // a star means every language the packs ship
     public static Set<String> requestFor(SearchSettings settings) {
         if (!settings.crossLanguage) {
             return Set.of();
@@ -62,7 +61,6 @@ public final class LanguageTable {
         return byLanguage.isEmpty();
     }
 
-
     public static LanguageTable load(ResourceManager resourceManager, SearchSettings settings) {
         if (!settings.crossLanguage) {
             return EMPTY;
@@ -79,11 +77,16 @@ public final class LanguageTable {
 
         Map<ResourceLocation, List<Resource>> available;
         try {
-            available = resourceManager.listResourceStacks("lang", path -> path.getPath().endsWith(".json"));
+            available = resourceManager.listResourceStacks("lang", path -> {
+                String code = languageCodeOf(path.getPath());
+                return code != null && (wanted == null || wanted.contains(code));
+            });
         } catch (Exception e) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(e);
             BetterSearch.LOGGER.warn("[{}] could not list language files",
                     BetterSearch.MOD_NAME, e);
-            return new LanguageTable(Map.of(), List.of(), request);
+
+            return new LanguageTable(Map.of(), List.of(), Set.of());
         }
 
         Map<String, Map<String, String>> result = new LinkedHashMap<>();
@@ -98,6 +101,7 @@ public final class LanguageTable {
                     readInto(resource, translations);
                 }
             } catch (Exception e) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(e);
                 BetterSearch.LOGGER.debug("[{}] language pack skipped ({}): {}",
                         BetterSearch.MOD_NAME, entry.getKey(), e.toString());
             }
@@ -144,18 +148,19 @@ public final class LanguageTable {
                     json.skipValue();
                     continue;
                 }
-                String value = json.nextString();
                 if (isInteresting(key)) {
-                    out.put(key, value);
+                    out.put(key, json.nextString());
+                } else {
+                    json.skipValue();
                 }
             }
             json.endObject();
         } catch (Exception e) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(e);
             BetterSearch.LOGGER.debug("[{}] skipped language file: {}", BetterSearch.MOD_NAME, e.toString());
         }
     }
 
-    // only item and block keys, the rest of the lang file is noise here
     private static boolean isInteresting(String key) {
         return key.startsWith("item.") || key.startsWith("block.");
     }

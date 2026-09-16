@@ -2,74 +2,113 @@ plugins {
     id 'base'
 }
 
-/*
- * Teste do motor de busca SEM Minecraft e SEM loader.
- *
- *   ./gradlew coreTest
- *
- * Compila so o core/ (Java puro) mais o tools/BetterSearchCoreTest.java e roda as 157
- * verificacoes: acentos, erro de digitacao, outros idiomas, correcao de comandos, apelidos
- * secretos. Como nao depende de versao nem de loader, este mesmo teste vale para TODOS os
- * ports - e e a primeira coisa a rodar depois de mexer no algoritmo.
- */
+repositories {
+    mavenCentral()
+    maven { url = 'https://libraries.minecraft.net/' }
+}
+
+configurations {
+    verificationGson
+    verificationBrigadier
+}
+
+dependencies {
+    verificationGson 'com.google.code.gson:gson:2.2.4'
+    verificationBrigadier 'com.mojang:brigadier:1.3.10'
+}
+
 def coreTestDir = layout.buildDirectory.dir('coreTest')
+def lifecycleTestDir = layout.buildDirectory.dir('lifecycleTest')
+def enterTestDir = layout.buildDirectory.dir('enterTest')
 
 tasks.register('compileCoreTest', JavaCompile) {
     group = 'verification'
-    description = 'Compila o nucleo de busca e o teste, sem Minecraft.'
-    // So o core e o teste. O fileTree('tools') inteiro arrastava os esbocos de LWJGL e de
-    // Gson para dentro do resultado do teste, que nao tem nada a ver com eles.
-    source = fileTree('core/src/main/java/com/rivalzin/bettersearch/core') +
-             files('tools/BetterSearchCoreTest.java')
+    source = fileTree('core/src/main/java/com/rivalzin/bettersearch/core') + files('tools/BetterSearchCoreTest.java')
     include '**/*.java'
     classpath = files()
     destinationDirectory = coreTestDir
     options.encoding = 'UTF-8'
-    // O Gradle 9 cobra os tres. So o release nao basta: a tarefa e registrada na mao, e sem
-    // sourceCompatibility/targetCompatibility ele para antes de compilar.
-    sourceCompatibility = '21'
-    targetCompatibility = '21'
-    options.release = 21
+    sourceCompatibility = '8'
+    targetCompatibility = '8'
+    options.release = 8
 }
 
 tasks.register('coreTest', JavaExec) {
     group = 'verification'
-    description = 'Roda os testes do motor de busca (nao precisa do Minecraft).'
+    description = 'Testa o algoritmo compartilhado com compatibilidade Java 8.'
     dependsOn 'compileCoreTest'
     classpath = files(coreTestDir)
     mainClass = 'com.rivalzin.bettersearch.tools.BetterSearchCoreTest'
-    jvmArgs = ['-Dfile.encoding=UTF-8']
+    jvmArgs '-Dfile.encoding=UTF-8'
 }
 
-/*
- * Junta os jars de todos os loaders em build/dist, para nao ter de cacar um por um.
- *
- *   ./gradlew dist
- */
-tasks.register('dist', Copy) {
+tasks.register('compileLifecycleTest', JavaCompile) {
+    group = 'verification'
+    source = fileTree('core/src/main/java') + fileTree('tools/async') { include '*.java' } +
+            files('tools/state/BetterSearchStateTest.java', 'tools/FailurePolicyTest.java')
+    include '**/*.java'
+    classpath = configurations.verificationGson
+    destinationDirectory = lifecycleTestDir
+    options.encoding = 'UTF-8'
+    sourceCompatibility = '8'
+    targetCompatibility = '8'
+    options.release = 8
+}
+
+['asyncTest': 'BetterSearchAsyncTest', 'stateTest': 'BetterSearchStateTest',
+ 'failurePolicyTest': 'FailurePolicyTest'].each { taskName, className ->
+    tasks.register(taskName, JavaExec) {
+        group = 'verification'
+        dependsOn 'compileLifecycleTest'
+        classpath = files(lifecycleTestDir) + configurations.verificationGson
+        mainClass = "com.rivalzin.bettersearch.tools.${className}"
+        jvmArgs '-Dfile.encoding=UTF-8'
+        if (taskName == 'stateTest') {
+            doFirst {
+                args = [layout.buildDirectory.dir("state-test/gradle-${UUID.randomUUID()}").get().asFile.absolutePath]
+            }
+        }
+    }
+}
+
+tasks.register('compileEnterTest', JavaCompile) {
+    group = 'verification'
+    dependsOn 'compileCoreTest'
+    source = files('tools/enter/BetterSearchEnterTest.java')
+    classpath = files(coreTestDir) + configurations.verificationBrigadier
+    destinationDirectory = enterTestDir
+    options.encoding = 'UTF-8'
+    sourceCompatibility = '17'
+    targetCompatibility = '17'
+    options.release = 17
+}
+
+tasks.register('enterTest', JavaExec) {
+    group = 'verification'
+    dependsOn 'compileEnterTest'
+    classpath = files(coreTestDir, enterTestDir) + configurations.verificationBrigadier
+    mainClass = 'com.rivalzin.bettersearch.tools.BetterSearchEnterTest'
+    jvmArgs '-Dfile.encoding=UTF-8'
+}
+
+tasks.named('check') {
+    dependsOn 'coreTest', 'asyncTest', 'stateTest', 'failurePolicyTest', 'enterTest'
+}
+
+tasks.register('dist', Sync) {
     group = 'build'
-    description = 'Constroi TODOS os loaders e junta os jars em build/dist.'
-    // Uma linha por alvo, na mesma ordem do settings.gradle. Ao acrescentar uma versao, some
-    // o caminho dela aqui - e a secao 33 do tools/verify.sh cobra que nenhuma fique de fora,
-    // que foi como 10 dos 22 alvos passaram meses sem entrar no dist. A 1.20.1 nao tem
-    // modulo neoforge de proposito: la o jar do Forge roda nos dois.
-    def alvos = [
-        'versions:mc1_7_10:forge',
-        'versions:mc1_12_2:forge',
-        'versions:mc1_16_5:forge',   'versions:mc1_16_5:fabric',
-        'versions:mc1_18_2:forge',   'versions:mc1_18_2:fabric',
-        'versions:mc1_19_2:forge',   'versions:mc1_19_2:fabric',
-        'versions:mc1_20_1:forge',   'versions:mc1_20_1:fabric',
-        'versions:mc1_21_1:neoforge','versions:mc1_21_1:fabric',
-        'versions:mc1_21_4:neoforge','versions:mc1_21_4:fabric',
-        'versions:mc1_21_9:neoforge','versions:mc1_21_9:fabric',
-        'versions:mc1_21_11:neoforge','versions:mc1_21_11:fabric',
-        'versions:mc26_1:neoforge',  'versions:mc26_1:fabric',
-        'versions:mc26_2:neoforge',  'versions:mc26_2:fabric',
-    ]
-    dependsOn alvos.collect { ':' + it + ':build' }
-    from alvos.collect { it.replace(':', '/') + '/build/libs' }
+    description = 'Testa e compila os loaders configurados e copia somente os jars desta versao.'
+    dependsOn 'check'
+    def targets = subprojects.findAll { it.name in ['forge', 'neoforge', 'fabric'] }
+    if (targets.isEmpty()) {
+        throw new GradleException('dist exige os modulos Minecraft; remova -PcoreOnly=true.')
+    }
+    targets.each { target ->
+        dependsOn "${target.path}:build"
+        from(target.layout.buildDirectory.dir('libs')) {
+            include "*-${mod_version}.jar"
+            exclude '*-sources.jar', '*-dev.jar', '*-dev-shadow.jar', '*-shadow.jar'
+        }
+    }
     into layout.buildDirectory.dir('dist')
-    include '*.jar'
-    exclude '*-sources.jar', '*-dev.jar', '*-dev-shadow.jar', '*-shadow.jar'
 }

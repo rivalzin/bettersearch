@@ -11,7 +11,6 @@ import net.minecraft.network.chat.Component;
 
 import java.util.function.Consumer;
 
-// the knob animates on render time, not on tick
 public final class ToggleSwitch extends AbstractWidget {
     public static final int WIDTH = 28;
     public static final int HEIGHT = 14;
@@ -31,9 +30,19 @@ public final class ToggleSwitch extends AbstractWidget {
         this.animationStart = 0L;
     }
 
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+
+        if (this.active && this.visible && (keyCode == 257 || keyCode == 335 || keyCode == 32)) {
+            playDownSound(net.minecraft.client.Minecraft.getInstance().getSoundManager());
+            set(!value);
+            return true;
+        }
+        return false;
+    }
 
     @Override
-    @SuppressWarnings("deprecation")
+
     public void onClick(double mouseX, double mouseY) {
         set(!value);
     }
@@ -75,7 +84,7 @@ public final class ToggleSwitch extends AbstractWidget {
         int knobX = x + 1 + Math.round((getWidth() - 2 - KNOB_WIDTH) * position);
         int knob = !this.active
                 ? Theme.KNOB_DISABLED
-                : (this.isHovered ? Theme.KNOB_HOVER : Theme.KNOB);
+                : ((this.isHovered || this.isFocused()) ? Theme.KNOB_HOVER : Theme.KNOB);
         GuiComponent.fill(poseStack, knobX, y + 2, knobX + KNOB_WIDTH, bottom - 2, knob);
     }
 

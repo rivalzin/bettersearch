@@ -1,7 +1,7 @@
 package com.rivalzin.bettersearch.client;
 
 import com.rivalzin.bettersearch.BetterSearch;
-import com.rivalzin.bettersearch.core.EntryBuilder;
+import com.rivalzin.bettersearch.async.EntrySnapshot;
 import com.rivalzin.bettersearch.core.SearchField;
 import com.rivalzin.bettersearch.core.SearchIndex;
 import com.rivalzin.bettersearch.core.SearchSettings;
@@ -22,43 +22,37 @@ public final class CreativeIndexBuilder {
     private CreativeIndexBuilder() {
     }
 
-    public static SearchIndex<ItemStack> build(List<ItemStack> stacks,
+    public static java.util.function.Supplier<SearchIndex<ItemStack>> prepare(List<ItemStack> stacks,
                                                LanguageTable languages,
                                                SearchSettings settings,
                                                Item.TooltipContext tooltipContext,
                                                Player player) {
-        long start = System.nanoTime();
-        List<SearchIndex.Entry<ItemStack>> entries = new ArrayList<>(stacks.size());
 
         List<String> codes = activeCodes(languages, settings);
         boolean englishSearched = englishSearched(codes);
 
-        for (ItemStack stack : stacks) {
+        return EntrySnapshot.capture(stacks, stack -> {
             try {
-                entries.add(buildEntry(stack, languages, codes, settings, tooltipContext, player,
-                        englishSearched));
-            } catch (Throwable t) {
+                return buildEntry(stack, languages, codes, settings, tooltipContext, player,
+                        englishSearched);
+            } catch (RuntimeException | LinkageError t) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
                 BetterSearch.LOGGER.debug("[{}] skipped item: {}", BetterSearch.MOD_NAME, t.toString());
             }
-        }
-
-        SearchIndex<ItemStack> index = new SearchIndex<>(entries);
-        BetterSearch.LOGGER.info("[{}] index ready: {} items in {} ms",
-                BetterSearch.MOD_NAME, entries.size(), (System.nanoTime() - start) / 1_000_000);
-        return index;
+            return null;
+        });
     }
 
-    // the whole cost of the mod is here, once per item
-    private static SearchIndex.Entry<ItemStack> buildEntry(ItemStack stack,
+    private static EntrySnapshot<ItemStack> buildEntry(ItemStack stack,
                                                            LanguageTable languages,
                                                            List<String> codes,
                                                            SearchSettings settings,
                                                            Item.TooltipContext tooltipContext,
                                                            Player player,
                                                            boolean englishSearched) {
-        EntryBuilder<ItemStack> builder = new EntryBuilder<>(stack);
+        EntrySnapshot<ItemStack> builder = new EntrySnapshot<>(stack);
         fill(builder, stack, languages, codes, settings, tooltipContext, player, englishSearched);
-        return builder.build();
+        return builder;
     }
 
     public static List<String> activeCodes(LanguageTable languages, SearchSettings settings) {
@@ -75,7 +69,7 @@ public final class CreativeIndexBuilder {
         return codes.contains("en_us") || "en_us".equals(LanguageCatalog.currentCode());
     }
 
-    public static void fill(EntryBuilder<?> builder,
+    public static void fill(EntrySnapshot<?> builder,
                             ItemStack stack,
                             LanguageTable languages,
                             List<String> codes,
@@ -106,7 +100,7 @@ public final class CreativeIndexBuilder {
                     SearchField.SOURCE_ID);
         }
 
-        if (settings.searchTooltips && hasExtraData(stack)) {
+        if (settings.searchTooltips) {
             List<Component> lines = stack.getTooltipLines(tooltipContext, player, TooltipFlag.Default.NORMAL);
             int limit = Math.min(lines.size(), MAX_TOOLTIP_LINES + 1);
             for (int i = 1; i < limit; i++) {
@@ -119,8 +113,4 @@ public final class CreativeIndexBuilder {
         }
     }
 
-    // enchanted or named stacks get their own entry, plain ones share
-    private static boolean hasExtraData(ItemStack stack) {
-        return !stack.getComponentsPatch().isEmpty();
-    }
 }

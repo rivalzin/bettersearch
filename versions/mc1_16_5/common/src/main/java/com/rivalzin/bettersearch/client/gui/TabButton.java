@@ -9,7 +9,6 @@ import net.minecraft.network.chat.Component;
 
 import java.util.function.BooleanSupplier;
 
-// flat tab with its own border: the accent line under it is what marks the active one
 public final class TabButton extends AbstractWidget {
     public static final int HEIGHT = 20;
 
@@ -23,7 +22,18 @@ public final class TabButton extends AbstractWidget {
     }
 
     @Override
-    @SuppressWarnings("deprecation")
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+
+        if (this.active && this.visible && (keyCode == 257 || keyCode == 335 || keyCode == 32)) {
+            playDownSound(net.minecraft.client.Minecraft.getInstance().getSoundManager());
+            onSelect.run();
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+
     public void onClick(double mouseX, double mouseY) {
         onSelect.run();
     }
@@ -36,7 +46,7 @@ public final class TabButton extends AbstractWidget {
         int right = x + getWidth();
         int bottom = y + getHeight();
 
-        int background = active ? Theme.TAB_ACTIVE : (this.isHovered ? Theme.TAB_HOVER : Theme.TAB_IDLE);
+        int background = active ? Theme.TAB_ACTIVE : ((this.isHovered || this.isFocused()) ? Theme.TAB_HOVER : Theme.TAB_IDLE);
         GuiComponent.fill(poseStack, x, y, right, bottom, Theme.BORDER);
         GuiComponent.fill(poseStack, x + 1, y + 1, right - 1, bottom - 1, background);
         if (active) {

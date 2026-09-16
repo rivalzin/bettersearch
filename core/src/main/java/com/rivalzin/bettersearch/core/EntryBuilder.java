@@ -5,7 +5,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-// built once per item at index time, never during a search
 public final class EntryBuilder<T> {
     private final T value;
     private final List<SearchField> fields = new ArrayList<>(4);
@@ -17,9 +16,8 @@ public final class EntryBuilder<T> {
         this.value = value;
     }
 
-    // only add() reaches this: everything the mod indexes arrives raw
     private EntryBuilder<T> addNormalized(String normalized, byte source) {
-        if (normalized != null && !normalized.isEmpty() && seen.add(normalized)) {
+        if (normalized != null && !normalized.isEmpty() && seen.add(source + ":" + normalized)) {
             fields.add(new SearchField(normalized, source));
         }
         return this;
@@ -34,25 +32,43 @@ public final class EntryBuilder<T> {
         return this;
     }
 
-    /**
-     * What kind of thing this is: netherite_boots and leather_boots are both boots. Taken from
-     * the registry name and not from the display name, because the id reads the same in every
-     * language - a mod that ships no translation still lands beside its vanilla neighbours.
-     */
     public EntryBuilder<T> family(String registryPath) {
         this.family = familyOf(registryPath);
         return this;
     }
 
-    static String familyOf(String registryPath) {
+    public static String familyOf(String registryPath) {
         if (registryPath == null) {
             return "";
         }
-        int cut = registryPath.lastIndexOf('_');
-        String tail = cut >= 0 && cut + 1 < registryPath.length()
-                ? registryPath.substring(cut + 1)
-                : registryPath;
+
+        int end = registryPath.length();
+        int cut = registryPath.lastIndexOf('_', end - 1);
+        while (cut >= 0 && allDigits(registryPath, cut + 1, end)) {
+            end = cut;
+            cut = registryPath.lastIndexOf('_', end - 1);
+        }
+        String tail = cut >= 0 && cut + 1 < end
+                ? registryPath.substring(cut + 1, end)
+                : registryPath.substring(0, end);
+
+        if (tail.isEmpty()) {
+            tail = registryPath;
+        }
         return TextNormalizer.normalize(tail);
+    }
+
+    private static boolean allDigits(String text, int from, int to) {
+        if (from >= to) {
+            return false;
+        }
+        for (int i = from; i < to; i++) {
+            char c = text.charAt(i);
+            if (c < '0' || c > '9') {
+                return false;
+            }
+        }
+        return true;
     }
 
     public boolean isEmpty() {

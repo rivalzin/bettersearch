@@ -1,69 +1,71 @@
 package com.rivalzin.bettersearch.client;
 
 import com.rivalzin.bettersearch.BetterSearch;
+import com.rivalzin.bettersearch.async.AsyncIndexState;
 import com.rivalzin.bettersearch.core.SearchIndex;
 import com.rivalzin.bettersearch.core.SearchQuery;
 import com.rivalzin.bettersearch.core.SearchSettings;
 import net.minecraft.client.Minecraft;
 import net.minecraft.creativetab.CreativeTabs;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.init.Items;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.enchantment.Enchantment;
+import net.minecraft.init.Items;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class CreativeSearch {
-    private static volatile SearchIndex<ItemStack> index;
-    private static volatile String indexLanguage = "";
-    private static volatile int indexStamp = -1;
-    // the client tick and the viewer thread both come through here, and a plain
-    // read-then-write let the two of them start the same work twice
-    private static final java.util.concurrent.atomic.AtomicBoolean building =
-            new java.util.concurrent.atomic.AtomicBoolean();
-
-    private static SearchIndex<ItemStack> cachedIndex;
-    private static String cachedQuery;
-    private static List<ItemStack> cachedResult;
+    private static final AsyncIndexState<SearchIndex<ItemStack>> INDEX = new AsyncIndexState<>(
+            task -> Minecraft.getMinecraft().func_152344_a(task), ForkJoinPool.commonPool(),
+            task -> Minecraft.getMinecraft().func_152344_a(task),
+            error -> BetterSearch.LOGGER.error("[{}] failed to build creative index", BetterSearch.MOD_NAME, error));
+    private static final AtomicBoolean checking = new AtomicBoolean();
+    private static volatile Context context;
+    private static volatile Cache cache;
+    private static volatile int generation;
 
     private CreativeSearch() {
     }
 
     public static void warmUp() {
         SearchSettings settings = ModConfig.settings();
-        // NEI reads this index too, through searchForViewer
-        if (!settings.enabled || (!settings.searchCreative && !settings.searchJei)) {
-            return;
+        if (settings.enabled && (settings.searchCreative || settings.searchJei)) {
+            ensureIndex();
         }
-        ensureIndex();
     }
 
     public static List<ItemStack> search(String query) {
-        if (query == null || !ModConfig.settings().enabled || !ModConfig.settings().searchCreative) {
+        SearchSettings settings = ModConfig.settings();
+        if (query == null || !settings.enabled || !settings.searchCreative) {
             return null;
         }
         ensureIndex();
-        SearchIndex<ItemStack> current = index;
+        return search(query, settings, current());
+    }
+
+    private static List<ItemStack> search(String query, SearchSettings settings, SearchIndex<ItemStack> current) {
         if (current == null) {
             return null;
         }
-        if (current == cachedIndex && query.equals(cachedQuery) && cachedResult != null) {
-            return cachedResult;
+        Cache cached = cache;
+        int stamp = ModConfig.stamp();
+        if (cached != null && cached.index == current && cached.stamp == stamp && query.equals(cached.query)) {
+            return cached.results;
         }
         try {
-            SearchQuery parsed = SearchQuery.parse(query, ModConfig.settings());
+            SearchQuery parsed = SearchQuery.parse(query, settings);
             if (parsed.isEmpty()) {
                 return null;
             }
-            List<ItemStack> result = current.search(parsed, ModConfig.settings());
-            cachedIndex = current;
-            cachedQuery = query;
-            cachedResult = result;
-            return result;
-        } catch (Throwable t) {
-            BetterSearch.LOGGER.error("[{}] creative search failed, falling back to vanilla",
-                    BetterSearch.MOD_NAME, t);
+            List<ItemStack> results = current.search(parsed, settings);
+            cache = new Cache(current, query, stamp, results);
+            return results;
+        } catch (RuntimeException | LinkageError error) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(error);
+            BetterSearch.LOGGER.error("[{}] creative search failed, falling back to vanilla", BetterSearch.MOD_NAME, error);
             return null;
         }
     }
@@ -74,25 +76,11 @@ public final class CreativeSearch {
             return null;
         }
         ensureIndex();
-        SearchIndex<ItemStack> current = index;
-        if (current == null) {
-            return null;
-        }
-        try {
-            SearchQuery parsed = SearchQuery.parse(query, settings);
-            if (parsed.isEmpty()) {
-                return null;
-            }
-            return current.search(parsed, settings);
-        } catch (Throwable t) {
-            BetterSearch.LOGGER.debug("[{}] NEI search failed, filter contributes nothing: {}",
-                    BetterSearch.MOD_NAME, t.toString());
-            return null;
-        }
+        return search(query, settings, current());
     }
 
     public static Object currentIndex() {
-        return index;
+        return current();
     }
 
     public static String stackKey(ItemStack stack) {
@@ -101,45 +89,83 @@ public final class CreativeSearch {
                 + (stack.hasTagCompound() ? String.valueOf(stack.getTagCompound()) : "");
     }
 
+    public static int generation() {
+        return generation;
+    }
+
+    private static SearchIndex<ItemStack> current() {
+        Context current = context;
+        return current != null && current.matches()
+                ? INDEX.ready(current, 0, 0) : null;
+    }
+
     private static void ensureIndex() {
-        LangTable.ensure(ModConfig.settings());
-        String language = Minecraft.getMinecraft().gameSettings.language;
-        int stamp = LangTable.stamp() + ModConfig.stamp() * 100_000;
-        if (building.get() || (index != null && indexLanguage.equals(language) && indexStamp == stamp)) {
+        if (!checking.compareAndSet(false, true)) {
             return;
         }
-        if (!building.compareAndSet(false, true)) {
-            return;
-        }
-        boolean queued = false;
         try {
-
-            final List<ItemStack> snapshot = collectLikeVanilla();
-            final String buildLanguage = language;
-            final int buildStamp = stamp;
-
-            Thread worker = new Thread(() -> {
+            Minecraft.getMinecraft().func_152344_a(() -> {
                 try {
-                    SearchIndex<ItemStack> renamed = CreativeIndex.build(snapshot, ModConfig.settings());
-                    index = renamed;
-                    indexLanguage = buildLanguage;
-                    indexStamp = buildStamp;
-                } catch (Throwable t) {
-                    BetterSearch.LOGGER.error("[{}] failed to build creative index",
-                            BetterSearch.MOD_NAME, t);
+                    refresh();
                 } finally {
-                    building.set(false);
+                    checking.set(false);
                 }
-            }, "BetterSearch-Indice-1.7.10");
-            worker.setDaemon(true);
-            worker.start();
-            queued = true;
-        } finally {
-            // nothing was queued, so the flag has to come back down here:
-            // otherwise one throw closes this path for the rest of the session
-            if (!queued) {
-                building.set(false);
-            }
+            });
+        } catch (RuntimeException | LinkageError error) {
+            checking.set(false);
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(error);
+            throw error;
+        }
+    }
+
+    private static void refresh() {
+        Minecraft minecraft = Minecraft.getMinecraft();
+        if (minecraft.thePlayer == null) {
+            INDEX.invalidate();
+            context = null;
+            cache = null;
+            return;
+        }
+        SearchSettings settings = ModConfig.settings();
+        LangTable.ensure(settings);
+        Context current = context;
+        if (current == null || !current.matches()) {
+            INDEX.invalidate();
+            current = new Context();
+            context = current;
+            cache = null;
+        }
+        INDEX.getPrepared(current, 0, 0,
+                () -> CreativeIndex.prepare(collectLikeVanilla(), settings), () -> {
+                    cache = null;
+                    generation++;
+                });
+    }
+
+    private static final class Context {
+        private final String language = Minecraft.getMinecraft().gameSettings.language;
+        private final int languageStamp = LangTable.stamp();
+        private final int configStamp = ModConfig.stamp();
+        private final java.lang.ref.WeakReference<Object> player = new java.lang.ref.WeakReference<>(Minecraft.getMinecraft().thePlayer);
+
+        boolean matches() {
+            Minecraft minecraft = Minecraft.getMinecraft();
+            return language.equals(minecraft.gameSettings.language) && languageStamp == LangTable.stamp()
+                    && configStamp == ModConfig.stamp() && player.get() == minecraft.thePlayer;
+        }
+    }
+
+    private static final class Cache {
+        final SearchIndex<ItemStack> index;
+        final String query;
+        final int stamp;
+        final List<ItemStack> results;
+
+        Cache(SearchIndex<ItemStack> index, String query, int stamp, List<ItemStack> results) {
+            this.index = index;
+            this.query = query;
+            this.stamp = stamp;
+            this.results = results;
         }
     }
 
@@ -154,7 +180,8 @@ public final class CreativeSearch {
             }
             try {
                 item.getSubItems(item, (CreativeTabs) null, source);
-            } catch (Throwable t) {
+            } catch (RuntimeException | LinkageError t) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
                 BetterSearch.LOGGER.debug("[{}] skipped modded item: {}",
                         BetterSearch.MOD_NAME, t.toString());
             }
@@ -163,7 +190,8 @@ public final class CreativeSearch {
             if (enchantment != null && enchantment.type != null) {
                 try {
                     Items.enchanted_book.func_92113_a(enchantment, source);
-                } catch (Throwable t) {
+                } catch (RuntimeException | LinkageError t) {
+                    com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
                     BetterSearch.LOGGER.debug("[{}] skipped enchantment: {}",
                             BetterSearch.MOD_NAME, t.toString());
                 }

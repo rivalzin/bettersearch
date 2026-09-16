@@ -14,8 +14,6 @@ public abstract class ChatScreenMixin {
     @Shadow
     protected EditBox input;
 
-    // Enter always gets here: the suggestion list only takes Tab, Esc and the arrows.
-    // Nothing is cancelled, the line is only rewritten when it is a name this version renamed.
     @Inject(method = "keyPressed(III)Z", at = @At("HEAD"))
     private void bettersearch$fixNamesBeforeSending(int key, int scancode, int modifiers,
                                                     CallbackInfoReturnable<Boolean> cir) {

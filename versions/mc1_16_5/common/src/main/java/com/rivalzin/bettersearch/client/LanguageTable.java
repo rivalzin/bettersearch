@@ -29,12 +29,11 @@ public final class LanguageTable {
     private final Set<String> requested;
 
     private LanguageTable(Map<String, Map<String, String>> byLanguage, List<String> order, Set<String> requested) {
-        this.byLanguage = byLanguage;
-        this.order = order;
-        this.requested = requested;
+        this.byLanguage = java.util.Collections.unmodifiableMap(byLanguage);
+        this.order = java.util.Collections.unmodifiableList(new ArrayList<>(order));
+        this.requested = java.util.Collections.unmodifiableSet(new LinkedHashSet<>(requested));
     }
 
-    // a star means every language the packs ship
     public static Set<String> requestFor(SearchSettings settings) {
         if (!settings.crossLanguage) {
             return java.util.Collections.emptySet();
@@ -62,7 +61,6 @@ public final class LanguageTable {
         return byLanguage.isEmpty();
     }
 
-
     public static LanguageTable load(ResourceManager resourceManager, SearchSettings settings) {
         if (!settings.crossLanguage) {
             return EMPTY;
@@ -77,41 +75,28 @@ public final class LanguageTable {
             }
         }
 
-        Map<ResourceLocation, List<Resource>> available = new LinkedHashMap<>();
+        Map<String, Map<String, String>> result = new LinkedHashMap<>();
         try {
             for (ResourceLocation id : resourceManager.listResources("lang", name -> name.endsWith(".json"))) {
                 String code = languageCodeOf(id.getPath());
-                // getResources opens a stream per pack, so only ask for what will be read
                 if (code == null || (wanted != null && !wanted.contains(code))) {
                     continue;
                 }
-                // a pack can list a path it cannot hand over: KubeJS does it with its own
-                // namespace. Skipping that one file used to skip every language there is.
                 try {
-                    available.put(id, resourceManager.getResources(id));
-                } catch (Exception e) {
-                    BetterSearch.LOGGER.debug("[{}] language file skipped ({}): {}",
-                            BetterSearch.MOD_NAME, id, e.toString());
+                    List<Resource> resources = resourceManager.getResources(id);
+                    Map<String, String> translations = result.computeIfAbsent(code, unused -> new HashMap<>(2048));
+                    for (Resource resource : resources) {
+                        readInto(resource, translations);
+                    }
+                } catch (Exception error) {
+                    com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(error);
+                    BetterSearch.LOGGER.debug("[{}] language file skipped ({})", BetterSearch.MOD_NAME, id, error);
                 }
             }
-        } catch (Exception e) {
-            BetterSearch.LOGGER.warn("[{}] could not list language files",
-                    BetterSearch.MOD_NAME, e);
-            return new LanguageTable(java.util.Collections.emptyMap(), java.util.Collections.emptyList(), request);
-        }
-
-        Map<String, Map<String, String>> result = new LinkedHashMap<>();
-        for (Map.Entry<ResourceLocation, List<Resource>> entry : available.entrySet()) {
-            String code = languageCodeOf(entry.getKey().getPath());
-            Map<String, String> translations = result.computeIfAbsent(code, unused -> new HashMap<>(2048));
-            try {
-                for (Resource resource : entry.getValue()) {
-                    readInto(resource, translations);
-                }
-            } catch (Exception e) {
-                BetterSearch.LOGGER.debug("[{}] language pack skipped ({}): {}",
-                        BetterSearch.MOD_NAME, entry.getKey(), e.toString());
-            }
+        } catch (Exception error) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(error);
+            BetterSearch.LOGGER.warn("[{}] could not list language files", BetterSearch.MOD_NAME, error);
+            return EMPTY;
         }
         result.values().removeIf(Map::isEmpty);
 
@@ -141,7 +126,8 @@ public final class LanguageTable {
     }
 
     private static void readInto(Resource resource, Map<String, String> out) {
-        try (InputStream in = resource.getInputStream();
+        try (Resource closeable = resource;
+             InputStream in = closeable.getInputStream();
              Reader charReader = new InputStreamReader(in, StandardCharsets.UTF_8);
              JsonReader json = new JsonReader(charReader)) {
             json.setLenient(true);
@@ -155,18 +141,19 @@ public final class LanguageTable {
                     json.skipValue();
                     continue;
                 }
-                String value = json.nextString();
                 if (isInteresting(key)) {
-                    out.put(key, value);
+                    out.put(key, json.nextString());
+                } else {
+                    json.skipValue();
                 }
             }
             json.endObject();
         } catch (Exception e) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(e);
             BetterSearch.LOGGER.debug("[{}] skipped language file: {}", BetterSearch.MOD_NAME, e.toString());
         }
     }
 
-    // only item and block keys, the rest of the lang file is noise here
     private static boolean isInteresting(String key) {
         return key.startsWith("item.") || key.startsWith("block.");
     }

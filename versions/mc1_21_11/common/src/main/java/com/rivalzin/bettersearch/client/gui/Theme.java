@@ -1,6 +1,5 @@
 package com.rivalzin.bettersearch.client.gui;
 
-// one place for the colors, so every widget on the screen agrees on them
 public final class Theme {
     public static final int ACCENT = 0xFF6FD9E8;
 

@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "CreativeModeInventoryScreenMixin",
+    "CreativeScreenAccessor",
     "RecipeBookComponentMixin",
     "CommandSuggestionsMixin",
     "ChatScreenMixin",

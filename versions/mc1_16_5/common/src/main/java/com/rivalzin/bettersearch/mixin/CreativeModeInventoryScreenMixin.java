@@ -32,7 +32,6 @@ public abstract class CreativeModeInventoryScreenMixin {
     @Unique
     private static int bettersearch$poolRegistrySize = -1;
 
-    // the descriptor is pinned: vanilla renamed this method twice already
     @Inject(method = "refreshSearchResults", at = @At("RETURN"))
     private void bettersearch$refreshSearchResults(CallbackInfo ci) {
         if (!BetterSearchClient.isEnabled()) {
@@ -71,10 +70,8 @@ public abstract class CreativeModeInventoryScreenMixin {
         menu.scrollTo(0.0F);
     }
 
-    // the empty box hands back the whole list on every open and every backspace, and a new
-    // copy each time would look like a new pool and rebuild the index from scratch
     @Unique
-    @SuppressWarnings("deprecation")
+
     private static List<ItemStack> bettersearch$poolOf(List<ItemStack> items) {
         List<ItemStack> cached = bettersearch$pool;
         if (cached != null && cached.size() == items.size()
@@ -87,14 +84,14 @@ public abstract class CreativeModeInventoryScreenMixin {
     }
 
     @Unique
-    @SuppressWarnings("deprecation")
+
     private static void bettersearch$remember(List<ItemStack> pool) {
         bettersearch$pool = pool;
         bettersearch$poolRegistrySize = Registry.ITEM.keySet().size();
     }
 
     @Unique
-    @SuppressWarnings("deprecation")
+
     private static List<ItemStack> bettersearch$pool() {
         List<ItemStack> cached = bettersearch$pool;
         if (cached != null && bettersearch$poolRegistrySize == Registry.ITEM.keySet().size()) {

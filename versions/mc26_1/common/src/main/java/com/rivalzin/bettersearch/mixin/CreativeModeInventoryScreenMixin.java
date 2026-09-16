@@ -22,7 +22,6 @@ public abstract class CreativeModeInventoryScreenMixin {
     @Shadow
     private static CreativeModeTab selectedTab;
 
-    // the descriptor is pinned: vanilla renamed this method twice already
     @Inject(method = "refreshSearchResults", at = @At("RETURN"))
     private void bettersearch$refreshSearchResults(CallbackInfo ci) {
         if (!BetterSearchClient.isEnabled()) {

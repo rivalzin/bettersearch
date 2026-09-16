@@ -44,7 +44,8 @@ public abstract class ModPresencePlugin implements IMixinConfigPlugin {
             Object instance = loader.getMethod("getInstance").invoke(null);
             Object loaded = loader.getMethod("isModLoaded", String.class).invoke(instance, modId);
             return Boolean.TRUE.equals(loaded);
-        } catch (Throwable ignored) {
+        } catch (Exception | LinkageError ignored) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(ignored);
         }
 
         return getClass().getClassLoader().getResource(targetResource) != null;
@@ -58,7 +59,8 @@ public abstract class ModPresencePlugin implements IMixinConfigPlugin {
                 return null;
             }
             return type.getMethod("getModFileById", String.class).invoke(instance, modId) != null;
-        } catch (Throwable ignored) {
+        } catch (Exception | LinkageError ignored) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(ignored);
             return null;
         }
     }
@@ -71,13 +73,14 @@ public abstract class ModPresencePlugin implements IMixinConfigPlugin {
                 return null;
             }
             return Boolean.TRUE.equals(type.getMethod("isLoaded", String.class).invoke(instance, modId));
-        } catch (Throwable ignored) {
+        } catch (Exception | LinkageError ignored) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(ignored);
             return null;
         }
     }
 
     @Override
-    // viewer not installed = mixin never applies
+
     public final boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
         return present;
     }

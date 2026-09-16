@@ -4,7 +4,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiButton;
 
-// no vanilla button texture: this one is flat so it looks the same on every version
 public final class FlatButton extends GuiButton implements Pressable {
     private static final int BACKGROUND = 0x66000000;
     private static final int BACKGROUND_HOVER = 0xAA000000;

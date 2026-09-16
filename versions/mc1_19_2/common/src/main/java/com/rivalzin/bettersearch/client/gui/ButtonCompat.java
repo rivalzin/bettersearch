@@ -7,7 +7,6 @@ public final class ButtonCompat {
     private ButtonCompat() {
     }
 
-    // the button constructor changed shape almost every version
     public static Builder builder(Component text, Button.OnPress action) {
         return new Builder(text, action);
     }

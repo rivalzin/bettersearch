@@ -10,18 +10,20 @@ public final class NeiIntegration {
         if (installed) {
             return;
         }
-        installed = true;
         boolean modern;
         try {
             Class.forName("codechicken.nei.SearchTokenParser");
             modern = true;
         } catch (ClassNotFoundException noParser) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(noParser);
             modern = false;
         }
-        // one gate class per flavor: a class touching both APIs dies at load, not at the if
+
         String gate = modern
                 ? "com.rivalzin.bettersearch.forge.nei.NeiIntegrationModern"
                 : "com.rivalzin.bettersearch.forge.nei.NeiIntegrationLegacy";
         Class.forName(gate).getMethod("install").invoke(null);
+
+        installed = true;
     }
 }

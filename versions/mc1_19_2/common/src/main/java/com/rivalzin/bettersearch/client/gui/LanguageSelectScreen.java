@@ -1,5 +1,6 @@
 package com.rivalzin.bettersearch.client.gui;
 
+import com.rivalzin.bettersearch.client.BetterSearchClient;
 import com.rivalzin.bettersearch.client.LanguageCatalog;
 import com.rivalzin.bettersearch.core.SearchSettings;
 import com.rivalzin.bettersearch.core.TextNormalizer;
@@ -14,7 +15,6 @@ import net.minecraft.network.chat.Component;
 import java.util.ArrayList;
 import java.util.List;
 
-// the list is what the resource packs actually ship, not a hardcoded table
 public final class LanguageSelectScreen extends OptionRowsScreen {
     private final SearchSettings settings;
     private final List<LanguageCatalog.Entry> languages;
@@ -77,6 +77,10 @@ public final class LanguageSelectScreen extends OptionRowsScreen {
             searchBox.setSuggestion(
                     Component.translatable("bettersearch.config.languages.search").getString());
             searchBox.setResponder(value -> {
+
+                searchBox.setSuggestion(value.isEmpty()
+                        ? Component.translatable("bettersearch.config.languages.search").getString()
+                        : null);
                 String normalized = TextNormalizer.normalize(value);
                 if (!normalized.equals(filter)) {
                     filter = normalized;
@@ -95,17 +99,17 @@ public final class LanguageSelectScreen extends OptionRowsScreen {
         int third = (width - 4) / 3;
         addFixed(ButtonCompat.builder(Component.translatable("bettersearch.config.select_all"), b -> {
             settings.languages = allCodes();
-            rebuildWidgets();
+            needsRebuild = true;
         }).bounds(x, y + BUTTON_GAP, third, BUTTON_HEIGHT).build());
 
         addFixed(ButtonCompat.builder(Component.translatable("bettersearch.config.select_none"), b -> {
             settings.languages = new ArrayList<>();
-            rebuildWidgets();
+            needsRebuild = true;
         }).bounds(x + third + 2, y + BUTTON_GAP, third, BUTTON_HEIGHT).build());
 
         addFixed(ButtonCompat.builder(Component.translatable("bettersearch.config.select_default"), b -> {
             settings.languages = new ArrayList<>(SearchSettings.DEFAULT_LANGUAGES);
-            rebuildWidgets();
+            needsRebuild = true;
         }).bounds(x + 2 * (third + 2), y + BUTTON_GAP, width - 2 * (third + 2), BUTTON_HEIGHT).build());
 
         addFixed(ButtonCompat.builder(CommonComponents.GUI_DONE, b -> onClose())
@@ -169,4 +173,11 @@ public final class LanguageSelectScreen extends OptionRowsScreen {
         }
         return all;
     }
+
+    @Override
+    public void removed() {
+        BetterSearchClient.applyAndSave(settings);
+        super.removed();
+    }
+
 }

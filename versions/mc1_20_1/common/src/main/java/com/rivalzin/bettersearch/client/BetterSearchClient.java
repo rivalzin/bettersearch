@@ -4,98 +4,195 @@ import com.rivalzin.bettersearch.BetterSearch;
 import com.rivalzin.bettersearch.core.SearchIndex;
 import com.rivalzin.bettersearch.core.SearchQuery;
 import com.rivalzin.bettersearch.core.SearchSettings;
+import com.rivalzin.bettersearch.state.VersionedState;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicLong;
 
 public final class BetterSearchClient {
-    // read from the EMI and REI worker threads, written on the client thread
     private static volatile SearchSettings settings = new SearchSettings();
-    private static volatile LanguageTable languages = LanguageTable.EMPTY;
-    private static Path configFile;
-
-    private static volatile SearchIndex<ItemStack> index;
-    private static Object indexedSource;
-    private static int indexedSize = -1;
-    private static long indexedStamp = -1;
-
-    // bumped on every reload; volatile because a long is not read atomically on 32 bit
-    private static volatile long languageStamp;
-    private static boolean building;
-    private static boolean resourcesReady;
-    // one throw and the mod stands down for the session instead of spamming;
-    // volatile because the viewer threads read it through isEnabled()
-    private static volatile boolean disabledByError;
-
-    private static Object pendingSource;
-    private static int pendingSize;
-
-    private static String cachedQuery;
-    private static List<ItemStack> cachedResults;
+    private static final VersionedState<LanguageTable> languageState = new VersionedState<>(LanguageTable.EMPTY);
+    private static final AsyncIndex<ItemStack> index = new AsyncIndex<>("creative");
+    private static final AtomicLong languageStamp = new AtomicLong();
+    private static final CopyOnWriteArrayList<Runnable> settingsAppliedListeners = new CopyOnWriteArrayList<>();
+    private static final CopyOnWriteArrayList<Runnable> invalidateListeners = new CopyOnWriteArrayList<>();
+    private static volatile Path configFile;
+    private static volatile boolean resourcesReady;
+    private static volatile long resourceReloadRevision;
+    private static volatile long languageFailedAt;
+    private static volatile SearchCache queryCache;
+    private static final java.util.concurrent.atomic.AtomicBoolean creativeOrderRequested =
+            new java.util.concurrent.atomic.AtomicBoolean();
+    private static volatile Map<Item, Integer> creativeOrder = Collections.emptyMap();
+    private static Object creativeOrderSource;
+    private static int creativeOrderSize = -1;
+    private static long creativeOrderFingerprint;
 
     private BetterSearchClient() {
     }
 
     public static SearchSettings settings() {
-        return settings;
+        return settings.copy();
     }
 
     public static LanguageTable languages() {
-        return languages;
+        ensureLanguagesLoaded();
+        return languageState.value();
     }
 
     public static long languageStamp() {
-        return languageStamp;
+        return languageStamp.get();
     }
 
-    public static void setSettings(SearchSettings newSettings) {
-        newSettings.sanitize();
+    public static synchronized void setSettings(SearchSettings updated) {
+        SearchSettings incoming = updated.copy();
+        incoming.sanitize();
         SearchSettings previous = settings;
-        settings = newSettings;
-
-        cachedQuery = null;
-        cachedResults = null;
-
-        if (newSettings.affectsIndex(previous)) {
+        if (incoming.equals(previous)) {
+            return;
+        }
+        if (incoming.affectsLanguageTable(previous)) {
+            languageState.invalidate();
+            languageFailedAt = 0;
+        }
+        settings = incoming;
+        clearQueryCache();
+        if (incoming.affectsIndex(previous) || incoming.enabled != previous.enabled) {
             invalidate();
         }
         reloadLanguagesIfNeeded();
     }
 
-    // minecraft.execute queues by finish order, so the older reload could win
-    private static int languageRequest;
+    private static synchronized LanguageLoad beginLanguageLoad() {
+        return new LanguageLoad(languageState.begin(), settings.copy(), null);
+    }
 
-    private static void reloadLanguagesIfNeeded() {
-        if (!resourcesReady || languages.matchesRequest(settings)) {
+    public static LanguageLoad loadLanguages(ResourceManager resources) {
+        LanguageLoad load;
+        synchronized (BetterSearchClient.class) {
+            resourcesReady = false;
+            languageState.reset(LanguageTable.EMPTY);
+            load = beginLanguageLoad();
+            resourceReloadRevision = load.revision;
+        }
+        try {
+            return new LanguageLoad(load.revision, load.settings, LanguageTable.load(resources, load.settings));
+        } catch (RuntimeException error) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(error);
+            BetterSearch.LOGGER.error("[{}] failed to read languages", BetterSearch.MOD_NAME, error);
+            return new LanguageLoad(load.revision, load.settings, LanguageTable.EMPTY);
+        }
+    }
+
+    private static synchronized void reloadLanguagesIfNeeded() {
+        if (resourceReloadRevision != 0 || !resourcesReady || languageState.pending() || languageState.value().matchesRequest(settings)
+                || (languageFailedAt != 0 && System.nanoTime() - languageFailedAt < 1_000_000_000L)) {
             return;
         }
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null) {
             return;
         }
-        final ResourceManager resourceManager = minecraft.getResourceManager();
-        final SearchSettings snapshot = settings.copy();
-        final int request = ++languageRequest;
-        CompletableFuture
-                .supplyAsync(() -> LanguageTable.load(resourceManager, snapshot), Util.backgroundExecutor())
-                .whenComplete((table, error) -> minecraft.execute(() -> {
-                    if (error != null) {
-                        BetterSearch.LOGGER.error("[{}] failed to reload languages",
-                                BetterSearch.MOD_NAME, error);
-                        return;
-                    }
-                    if (request != languageRequest) {
-                        return;
-                    }
-                    onLanguagesLoaded(table);
-                }));
+        LanguageLoad load = beginLanguageLoad();
+        try {
+            ResourceManager resources = minecraft.getResourceManager();
+            CompletableFuture.supplyAsync(() -> LanguageTable.load(resources, load.settings), Util.backgroundExecutor())
+                    .whenComplete((table, error) -> {
+                        try {
+                            minecraft.execute(() -> {
+                                if (error != null) {
+                                    languageLoadFailed(load.revision, error);
+                                } else {
+                                    onLanguagesLoaded(new LanguageLoad(load.revision, load.settings, table));
+                                }
+                            });
+                        } catch (RuntimeException | LinkageError schedulingFailure) {
+                            languageLoadFailed(load.revision, schedulingFailure);
+                        }
+                    });
+        } catch (RuntimeException | LinkageError schedulingFailure) {
+            languageLoadFailed(load.revision, schedulingFailure);
+        }
+    }
+
+    private static synchronized void languageLoadFailed(long revision, Throwable error) {
+        com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(error);
+        if (languageState.fail(revision)) {
+            languageFailedAt = System.nanoTime();
+            BetterSearch.LOGGER.error("[{}] failed to reload languages", BetterSearch.MOD_NAME, error);
+        }
+    }
+
+    public static synchronized void onLanguagesLoaded(LanguageLoad load) {
+        if (load.revision == resourceReloadRevision) {
+            resourceReloadRevision = 0;
+        } else if (resourceReloadRevision != 0) {
+            return;
+        }
+        resourcesReady = true;
+        if (load.table == null || !load.table.matchesRequest(settings)) {
+            if (languageState.fail(load.revision)) {
+                languageFailedAt = System.nanoTime();
+            }
+            reloadLanguagesIfNeeded();
+            return;
+        }
+        if (!languageState.publish(load.revision, load.table)) {
+            reloadLanguagesIfNeeded();
+            return;
+        }
+        languageFailedAt = 0;
+        invalidate();
+        notifySettingsApplied();
+    }
+
+    public static synchronized void onLanguagesLoaded(LanguageTable table) {
+        onLanguagesLoaded(new LanguageLoad(languageState.begin(), settings.copy(), table));
+    }
+
+    public static final class LanguageLoad {
+        private final long revision;
+        private final SearchSettings settings;
+        private final LanguageTable table;
+
+        private LanguageLoad(long revision, SearchSettings settings, LanguageTable table) {
+            this.revision = revision;
+            this.settings = settings;
+            this.table = table;
+        }
+    }
+
+    public static void ensureLanguagesLoaded() {
+        if (resourceReloadRevision != 0 || languageState.pending() || languageState.value().matchesRequest(settings)
+                || (languageFailedAt != 0 && System.nanoTime() - languageFailedAt < 1_000_000_000L)) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft != null && minecraft.player != null) {
+            minecraft.execute(() -> {
+                resourcesReady = true;
+                reloadLanguagesIfNeeded();
+            });
+        }
+    }
+
+    public static void warmUp() {
+        if (isEnabled()) {
+            ensureLanguagesLoaded();
+        }
     }
 
     public static void openConfigScreen() {
@@ -109,145 +206,197 @@ public final class BetterSearchClient {
         configFile = file;
     }
 
-    public static void applyAndSave(SearchSettings newSettings) {
-        setSettings(newSettings.copy());
-        if (configFile != null) {
-            ConfigIo.save(configFile, settings);
+    public static void applyAndSave(SearchSettings updated) {
+        SearchSettings incoming = updated.copy();
+        incoming.sanitize();
+        boolean changed = !incoming.equals(settings);
+        setSettings(incoming);
+        Path file = configFile;
+        if (file != null && (changed || !java.nio.file.Files.exists(file))) {
+            ConfigIo.save(file, settings);
         }
-        notifySettingsApplied();
+        if (changed) {
+            notifySettingsApplied();
+        }
     }
 
-    private static final java.util.List<Runnable> settingsAppliedListeners =
-            new java.util.concurrent.CopyOnWriteArrayList<>();
-
-    // viewers hold their own caches, this is how they hear about a change
     public static void onSettingsApplied(Runnable listener) {
-        settingsAppliedListeners.add(listener);
+        settingsAppliedListeners.addIfAbsent(java.util.Objects.requireNonNull(listener));
+    }
+
+    public static void onInvalidate(Runnable listener) {
+        invalidateListeners.addIfAbsent(java.util.Objects.requireNonNull(listener));
     }
 
     private static void notifySettingsApplied() {
-        for (Runnable listener : settingsAppliedListeners) {
+        runListeners(settingsAppliedListeners);
+    }
+
+    private static void runListeners(List<Runnable> listeners) {
+        for (Runnable listener : listeners) {
             try {
                 listener.run();
-            } catch (Throwable t) {
-                BetterSearch.LOGGER.debug("[{}] settings listener failed: {}",
-                        BetterSearch.MOD_NAME, t.toString());
+            } catch (RuntimeException error) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(error);
+                BetterSearch.LOGGER.debug("[{}] listener failed", BetterSearch.MOD_NAME, error);
             }
         }
     }
 
-    public static void onLanguagesLoaded(LanguageTable table) {
-        languages = table;
-        resourcesReady = true;
-        languageStamp++;
-        invalidate();
-        // the table lands after applyAndSave, so the viewers need a second poke
-        notifySettingsApplied();
-    }
-
-    public static void invalidate() {
-        index = null;
-        indexedSource = null;
-        indexedSize = -1;
-        indexedStamp = -1;
-
-        pendingSource = null;
-        pendingSize = -1;
-        cachedQuery = null;
-        cachedResults = null;
+    public static synchronized void invalidate() {
+        languageStamp.incrementAndGet();
+        index.invalidate();
+        clearQueryCache();
+        creativeOrder = Collections.emptyMap();
+        creativeOrderSource = null;
+        creativeOrderSize = -1;
         RecipeSearch.invalidate();
         CommandItemIndex.invalidate();
-
-        languageStamp++;
+        runListeners(invalidateListeners);
     }
 
+    private static void clearQueryCache() {
+        queryCache = null;
+    }
 
     public static boolean isEnabled() {
-        return settings.enabled && !disabledByError;
+        return settings.enabled;
     }
 
     public static void prepare(Collection<ItemStack> displayItems) {
         if (isEnabled() && settings.searchCreative && displayItems != null) {
+            rememberCreativeOrder(displayItems);
             ensureIndex(displayItems);
         }
     }
 
+    public static Map<Item, Integer> creativeOrder() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (creativeOrder.isEmpty() && minecraft != null && creativeOrderRequested.compareAndSet(false, true)) {
+            minecraft.execute(() -> {
+                try {
+                    ensureCreativeOrder();
+                    if (!creativeOrder.isEmpty()) {
+                        notifySettingsApplied();
+                    }
+                } finally {
+                    creativeOrderRequested.set(false);
+                }
+            });
+        }
+        return creativeOrder;
+    }
+
+    private static void ensureCreativeOrder() {
+        if (!creativeOrder.isEmpty()) {
+            return;
+        }
+        try {
+            rememberCreativeOrder(net.minecraft.world.item.CreativeModeTabs.searchTab().getDisplayItems());
+        } catch (RuntimeException ignored) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(ignored);
+
+        }
+    }
+
+    private static synchronized void rememberCreativeOrder(Collection<ItemStack> pool) {
+        long fingerprint = 1;
+        for (ItemStack stack : pool) {
+            fingerprint = fingerprint * 31 + System.identityHashCode(stack);
+        }
+        if (creativeOrderSource == pool && creativeOrderSize == pool.size()
+                && creativeOrderFingerprint == fingerprint) {
+            return;
+        }
+        Map<Item, Integer> order = new java.util.IdentityHashMap<>(pool.size());
+        int at = 0;
+        for (ItemStack stack : pool) {
+            if (stack != null && !stack.isEmpty()) {
+                order.putIfAbsent(stack.getItem(), at++);
+            }
+        }
+        if (creativeOrderSource == pool && creativeOrderFingerprint != fingerprint) {
+            index.invalidate();
+            clearQueryCache();
+        }
+        creativeOrder = Collections.unmodifiableMap(order);
+        creativeOrderSource = pool;
+        creativeOrderSize = pool.size();
+        creativeOrderFingerprint = fingerprint;
+    }
+
     public static List<ItemStack> search(String rawQuery, Collection<ItemStack> displayItems) {
-        if (!isEnabled() || !settings.searchCreative || rawQuery == null || displayItems == null) {
+        SearchSettings snapshot = settings;
+        if (!snapshot.enabled || !snapshot.searchCreative || rawQuery == null || displayItems == null) {
             return null;
         }
+        rememberCreativeOrder(displayItems);
         SearchIndex<ItemStack> current = ensureIndex(displayItems);
         if (current == null) {
             return null;
         }
-        if (rawQuery.equals(cachedQuery) && cachedResults != null) {
-            return cachedResults;
+        SearchCache cached = queryCache;
+        if (cached != null && current == cached.index && snapshot == cached.settings && rawQuery.equals(cached.query)) {
+            return cached.results;
         }
         try {
-            SearchQuery query = SearchQuery.parse(rawQuery, settings);
+            SearchQuery query = SearchQuery.parse(rawQuery, snapshot);
             if (query.isEmpty()) {
                 return null;
             }
-            List<ItemStack> results = current.search(query, settings);
-            cachedQuery = rawQuery;
-            cachedResults = results;
+            List<ItemStack> results = Collections.unmodifiableList(new ArrayList<>(current.search(query, snapshot)));
+            queryCache = new SearchCache(rawQuery, current, snapshot, results);
             return results;
-        } catch (Throwable t) {
-            disabledByError = true;
-            BetterSearch.LOGGER.error("[{}] search failed, falling back to vanilla",
-                    BetterSearch.MOD_NAME, t);
+        } catch (RuntimeException error) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(error);
+            index.invalidate();
+            clearQueryCache();
+            BetterSearch.LOGGER.error("[{}] search failed, falling back to vanilla", BetterSearch.MOD_NAME, error);
             return null;
         }
     }
 
-    private static SearchIndex<ItemStack> ensureIndex(Collection<ItemStack> source) {
-        SearchIndex<ItemStack> current = index;
-        boolean fresh = current != null
-                && indexedSource == source
-                && indexedSize == source.size()
-                && indexedStamp == languageStamp;
-        if (fresh) {
-            return current;
+    private static final class SearchCache {
+        private final String query;
+        private final SearchIndex<ItemStack> index;
+        private final SearchSettings settings;
+        private final List<ItemStack> results;
+
+        private SearchCache(String query, SearchIndex<ItemStack> index, SearchSettings settings, List<ItemStack> results) {
+            this.query = query;
+            this.index = index;
+            this.settings = settings;
+            this.results = results;
         }
-        if (!building && (pendingSource != source || pendingSize != source.size())) {
-            startBuild(source);
-        }
-        return null;
     }
 
-    private static void startBuild(Collection<ItemStack> source) {
+    private static SearchIndex<ItemStack> ensureIndex(Collection<ItemStack> source) {
         Minecraft minecraft = Minecraft.getInstance();
-        Player player = minecraft.player;
-        if (player == null) {
-            return;
+        if (minecraft == null || minecraft.player == null) {
+            return null;
         }
+        return index.getPrepared(source, source.size(), languageStamp.get(), () -> {
+            Player player = minecraft.player;
+            if (player == null) {
+                throw new IllegalStateException("Client player is unavailable");
+            }
+            return CreativeIndexBuilder.prepare(new ArrayList<>(source), languages(), settings.copy(), player);
+        }, () -> {
+            clearQueryCache();
+            refreshOpenSearch(minecraft);
+        });
+    }
 
-        final List<ItemStack> snapshot = List.copyOf(source);
-        final LanguageTable table = languages;
-        final SearchSettings snapshotSettings = settings.copy();
-        final long stamp = languageStamp;
-
-        building = true;
-        pendingSource = source;
-        pendingSize = source.size();
-
-        CompletableFuture
-                .supplyAsync(() -> CreativeIndexBuilder.build(
-                        snapshot, table, snapshotSettings, player), Util.backgroundExecutor())
-                .whenComplete((built, error) -> minecraft.execute(() -> {
-                    building = false;
-                    if (error != null) {
-                        BetterSearch.LOGGER.error("[{}] index build failed, using vanilla search",
-                                BetterSearch.MOD_NAME, error);
-                        disabledByError = true;
-                        return;
-                    }
-                    index = built;
-                    indexedSource = pendingSource;
-                    indexedSize = pendingSize;
-                    indexedStamp = stamp;
-                    cachedQuery = null;
-                    cachedResults = null;
-                }));
+    private static void refreshOpenSearch(Minecraft minecraft) {
+        try {
+            if (minecraft.screen instanceof com.rivalzin.bettersearch.mixin.CreativeScreenAccessor open) {
+                net.minecraft.client.gui.components.EditBox box = open.bettersearch$searchBox();
+                if (box != null && box.isVisible() && !box.getValue().isEmpty()) {
+                    open.bettersearch$refreshSearch();
+                }
+            }
+        } catch (RuntimeException ignored) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(ignored);
+        }
     }
 }

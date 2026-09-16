@@ -28,10 +28,19 @@ public abstract class IngredientFilterMixin {
         if (elementSearch == null) {
             return;
         }
-        List<IIngredientListElementInfo<?>> ours = JeiSearch.search(filterText, fromJei,
-                elementSearch.getAllIngredients(), (IngredientFilter) (Object) this);
-        if (ours != null) {
-            cir.setReturnValue(ours);
+
+        if (!JeiSearch.wants(filterText)) {
+            return;
+        }
+        try {
+            List<IIngredientListElementInfo<?>> ours = JeiSearch.search(filterText, fromJei,
+                    elementSearch.getAllIngredients(), (IngredientFilter) (Object) this, elementSearch);
+            if (ours != null) {
+                cir.setReturnValue(ours);
+            }
+        } catch (Exception | LinkageError t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
+
         }
     }
 }

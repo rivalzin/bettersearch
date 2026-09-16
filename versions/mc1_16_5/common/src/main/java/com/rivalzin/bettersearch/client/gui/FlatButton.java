@@ -7,7 +7,6 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Component;
 
-// no vanilla button texture: this one is flat so it looks the same on every version
 public final class FlatButton extends AbstractWidget {
     private static final int BACKGROUND = 0x66000000;
     private static final int BACKGROUND_HOVER = 0xAA000000;
@@ -24,7 +23,18 @@ public final class FlatButton extends AbstractWidget {
     }
 
     @Override
-    @SuppressWarnings("deprecation")
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+
+        if (this.active && this.visible && (keyCode == 257 || keyCode == 335 || keyCode == 32)) {
+            playDownSound(net.minecraft.client.Minecraft.getInstance().getSoundManager());
+            onPress.run();
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+
     public void onClick(double mouseX, double mouseY) {
         onPress.run();
     }

@@ -18,18 +18,15 @@ public final class BetterSearchFabricKeys {
             GLFW.GLFW_KEY_O,
             CATEGORY);
 
-    // written inside the press, read at the end of the tick
     private static boolean pending;
 
     private BetterSearchFabricKeys() {
     }
 
-    /** The Alt belongs to the default key: moved anywhere else, the key answers on its own. */
     static boolean needsAlt() {
         return OPEN_CONFIG.isDefault();
     }
 
-    // alt is a modifier in iris and in the shader screens, do not steal it there
     public static boolean shouldBlock(Screen screen) {
         if (screen == null || !Screen.hasAltDown() || !needsAlt()) {
             return false;
@@ -42,11 +39,11 @@ public final class BetterSearchFabricKeys {
     public static void register() {
         KeyBindingHelper.registerKeyBinding(OPEN_CONFIG);
         ShortcutWatcher.listen(BetterSearchFabricKeys::onKeyPress);
+        KeyConflictGuard.listenAlt(() -> Screen.hasAltDown());
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            KeyConflictGuard.update(OPEN_CONFIG, needsAlt(), Screen.hasAltDown());
+            KeyConflictGuard.update(OPEN_CONFIG, needsAlt());
             while (OPEN_CONFIG.consumeClick()) {
-                // the press already came in through ShortcutWatcher, with the Alt read at the
-                // right moment; the copy vanilla kept is dropped here
+
             }
             if (pending) {
                 pending = false;
@@ -55,7 +52,6 @@ public final class BetterSearchFabricKeys {
         });
     }
 
-    // runs inside the press, so the Alt is still under the finger when it is read
     private static void onKeyPress(String keyName) {
         String bound = OPEN_CONFIG.isUnbound() ? null : OPEN_CONFIG.saveString();
         if (ShortcutRule.opens(keyName, bound, needsAlt(), Screen.hasAltDown())) {

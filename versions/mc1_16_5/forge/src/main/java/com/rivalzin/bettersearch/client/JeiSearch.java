@@ -14,22 +14,26 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-// JEI asks per ingredient, so the query is parsed once and kept
 public final class JeiSearch {
     private static final String JEI_PREFIXES = "#$^%";
 
+    private static final com.rivalzin.bettersearch.async.SourceSnapshot<IIngredientListElementInfo<?>> SOURCES =
+            new com.rivalzin.bettersearch.async.SourceSnapshot<>();
     private static final AsyncIndex<IIngredientListElementInfo<?>> INDEX = new AsyncIndex<>("JEI ingredients");
 
-    private static WeakReference<IngredientFilter> filterRef = new WeakReference<>(null);
+    private static volatile WeakReference<IngredientFilter> filterRef = new WeakReference<>(null);
 
     static {
+
+        BetterSearchClient.onInvalidate(JeiSearch::invalidate);
         BetterSearchClient.onSettingsApplied(() -> {
             try {
                 IngredientFilter filter = filterRef.get();
                 if (filter != null) {
                     filter.invalidateCache();
                 }
-            } catch (Throwable ignored) {
+            } catch (Exception | LinkageError ignored) {
+                com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(ignored);
             }
         });
     }
@@ -39,12 +43,24 @@ public final class JeiSearch {
 
     public static void invalidate() {
         INDEX.invalidate();
+        SOURCES.clear();
+    }
+
+    public static boolean wants(String filterText) {
+        SearchSettings settings = BetterSearchClient.settings();
+        if (!BetterSearchClient.isEnabled() || !settings.searchJei) {
+            return false;
+        }
+        if (filterText == null || filterText.trim().isEmpty()) {
+            return false;
+        }
+        return !usesJeiSyntax(filterText);
     }
 
     public static List<IIngredientListElementInfo<?>> search(String filterText,
                                                    List<IIngredientListElementInfo<?>> jeiResult,
                                                    Collection<IIngredientListElementInfo<?>> source,
-                                                   IngredientFilter filter) {
+                                                   IngredientFilter filter, Object sourceIdentity) {
         try {
             SearchSettings settings = BetterSearchClient.settings();
             if (!BetterSearchClient.isEnabled() || !settings.searchJei) {
@@ -58,12 +74,17 @@ public final class JeiSearch {
             }
             remember(filter);
 
-            SearchIndex<IIngredientListElementInfo<?>> index = ensureIndex(source, settings);
+            SearchIndex<IIngredientListElementInfo<?>> index = ensureIndex(source, settings, sourceIdentity);
             if (index == null) {
                 return null;
             }
             SearchQuery query = SearchQuery.parse(filterText, settings);
             if (query.isEmpty()) {
+                return null;
+            }
+
+            if ((query.isBrowseOnly() || SearchQuery.isBrowsingByMod(filterText))
+                    && jeiResult != null && !jeiResult.isEmpty()) {
                 return null;
             }
 
@@ -103,7 +124,8 @@ public final class JeiSearch {
                 }
             }
             return merged;
-        } catch (Throwable t) {
+        } catch (Exception | LinkageError t) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
             com.rivalzin.bettersearch.BetterSearch.LOGGER.debug(
                     "[{}] JEI search left untouched: {}",
                     com.rivalzin.bettersearch.BetterSearch.MOD_NAME, t.toString());
@@ -118,9 +140,10 @@ public final class JeiSearch {
     }
 
     private static SearchIndex<IIngredientListElementInfo<?>> ensureIndex(Collection<IIngredientListElementInfo<?>> source,
-                                                                SearchSettings settings) {
+                                                                SearchSettings settings, Object sourceIdentity) {
+        final List<IIngredientListElementInfo<?>> capturedSource = SOURCES.capture(sourceIdentity, source);
         final long stamp = BetterSearchClient.languageStamp();
-        SearchIndex<IIngredientListElementInfo<?>> ready = INDEX.ready(IngredientFilter.class, source.size(), stamp);
+        SearchIndex<IIngredientListElementInfo<?>> ready = INDEX.ready(capturedSource, capturedSource.size(), stamp);
         if (ready != null) {
             return ready;
         }
@@ -129,14 +152,13 @@ public final class JeiSearch {
             return null;
         }
 
-        final List<IIngredientListElementInfo<?>> copy = java.util.Collections.unmodifiableList(new java.util.ArrayList<>(source));
-        final LanguageTable languages = BetterSearchClient.languages();
-        final SearchSettings captured = settings.copy();
-        final net.minecraft.world.entity.player.Player player = minecraft.player;
-
-        return INDEX.get(IngredientFilter.class, copy.size(), stamp,
-                () -> JeiIndexBuilder.build(copy, languages, captured, player),
-                JeiSearch::askJeiToSearchAgain);
+        return INDEX.getPrepared(capturedSource, capturedSource.size(), stamp, () -> {
+            final List<IIngredientListElementInfo<?>> copy = capturedSource;
+            final LanguageTable languages = BetterSearchClient.languages();
+            final SearchSettings captured = settings.copy();
+            final net.minecraft.world.entity.player.Player player = minecraft.player;
+            return JeiIndexBuilder.prepare(copy, languages, captured, player);
+        }, JeiSearch::askJeiToSearchAgain);
     }
 
     private static void askJeiToSearchAgain() {

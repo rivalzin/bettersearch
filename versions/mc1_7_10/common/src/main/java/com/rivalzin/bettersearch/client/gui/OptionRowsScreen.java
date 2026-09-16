@@ -104,7 +104,6 @@ public abstract class OptionRowsScreen extends GuiScreen {
 
     protected abstract void buildRows();
 
-    // footer is pinned to the bottom, the list scrolls under it
     protected abstract void buildPanelFooter();
 
     protected abstract String panelDefaultTitle();
@@ -124,7 +123,6 @@ public abstract class OptionRowsScreen extends GuiScreen {
         }
     }
 
-    @SuppressWarnings("unchecked")
     protected final <T extends GuiButton> T addButton(T widget) {
         this.buttonList.add(widget);
         return widget;
@@ -145,7 +143,7 @@ public abstract class OptionRowsScreen extends GuiScreen {
         panelX = this.width - MARGIN - panelWidth;
         listX = MARGIN;
         listWidth = panelX - MARGIN - listX;
-        // the last pixels are the scrollbar's, not the reset arrow's
+
         barWidth = listWidth - RESET_SIZE - 4 - SCROLLBAR_GUTTER;
         sliderWidth = MathHelper.clamp_int(barWidth * 45 / 100, 60, SLIDER_WIDTH_MAX);
         listBottom = contentBottom - listBottomInset();
@@ -201,9 +199,6 @@ public abstract class OptionRowsScreen extends GuiScreen {
     protected final int panelWidth() {
         return panelWidth;
     }
-
-
-
 
     private int controlX(int width) {
         return listX + barWidth - 6 - width;
@@ -495,7 +490,6 @@ public abstract class OptionRowsScreen extends GuiScreen {
     protected void updateFooterState() {
     }
 
-    // hover drives the preview, so it is tracked even when nothing is clicked
     private void updateHoveredRow(int mouseX, int mouseY) {
         hoveredRow = null;
         if (mouseX >= listX && mouseX <= listX + listWidth) {
@@ -592,7 +586,7 @@ public abstract class OptionRowsScreen extends GuiScreen {
         OpenGlHelper.glBlendFunc(770, 771, 1, 0);
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
         this.mc.getTextureManager().bindTexture(texture);
-        // GuiGraphics does not exist here, the scaled blit is done by hand
+
         drawScaledTexture(imageX, imageY, drawWidth, drawHeight,
                 PREVIEW_WIDTH, PREVIEW_HEIGHT);
         GL11.glDisable(GL11.GL_BLEND);
@@ -610,7 +604,6 @@ public abstract class OptionRowsScreen extends GuiScreen {
         tessellator.draw();
     }
 
-    // hand rolled: the vanilla scrollbar widget only exists from 1.20 on
     private void renderScrollbar(int mouseX, int mouseY) {
         if (maxScroll() <= 0) {
             return;
