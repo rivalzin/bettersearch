@@ -6,12 +6,14 @@ import com.rivalzin.bettersearch.client.LangTable;
 import net.minecraft.client.Minecraft;
 import mezz.jei.Internal;
 import mezz.jei.ingredients.IngredientFilter;
-import mezz.jei.suffixtree.CombinedSearchTrees;
 
 import java.lang.reflect.Field;
 
 public final class JeiIntegration {
-    private static Field treesField;
+    private static Field filterField;
+    private static Field searchField;
+    private static boolean legacy;
+    private static IngredientFilter appliedFilter;
     private static boolean announced;
     private static int appliedStamp = -1;
     private static int appliedGeneration = -1;
@@ -22,25 +24,29 @@ public final class JeiIntegration {
     }
 
     public static void install() throws Exception {
-        IngredientFilter filter = Internal.getIngredientFilter();
+        if (filterField == null) {
+            filterField = Internal.class.getDeclaredField("ingredientFilter");
+            filterField.setAccessible(true);
+        }
+        IngredientFilter filter = (IngredientFilter) filterField.get(null);
         if (filter == null) {
             return;
         }
-        if (treesField == null) {
-
-            treesField = IngredientFilter.class.getDeclaredField("combinedSearchTrees");
-            treesField.setAccessible(true);
-        }
-        Object current = treesField.get(filter);
-        boolean changed = false;
-        if (current != null && !(current instanceof JeiSearchTree)) {
-            treesField.set(filter, new JeiSearchTree((CombinedSearchTrees) current, filter));
-            changed = true;
-            if (!announced) {
-                announced = true;
-                BetterSearch.LOGGER.info("[{}] JEI search hooked (wrapped tree, no mixin)",
-                        BetterSearch.MOD_NAME);
+        if (searchField == null) {
+            searchField = HeiSearchHook.findField(IngredientFilter.class, "combinedSearchTrees");
+            legacy = searchField != null;
+            if (!legacy) {
+                searchField = HeiSearchHook.findField(IngredientFilter.class, "elementSearch");
             }
+            if (searchField == null) {
+                throw new NoSuchFieldException("No supported JEI/HEI search engine");
+            }
+        }
+        boolean changed = legacy ? LegacyJeiHook.install(filter, searchField)
+                : HeiSearchHook.install(filter, searchField);
+        if (changed && !announced) {
+            announced = true;
+            BetterSearch.LOGGER.info("[{}] {} search hooked", BetterSearch.MOD_NAME, legacy ? "JEI" : "HEI");
         }
 
         int stamp = ModConfig.stamp();
@@ -48,8 +54,9 @@ public final class JeiIntegration {
         int generation = JeiSearchBridge.generation();
         int languageStamp = LangTable.stamp();
         String language = Minecraft.getMinecraft().gameSettings.language;
-        if (changed || stamp != appliedStamp || generation != appliedGeneration
+        if (changed || filter != appliedFilter || stamp != appliedStamp || generation != appliedGeneration
                 || languageStamp != appliedLanguageStamp || !language.equals(appliedLanguage)) {
+            appliedFilter = filter;
             appliedStamp = stamp;
             appliedGeneration = generation;
             appliedLanguageStamp = languageStamp;

@@ -24,9 +24,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 public final class SearchHook {
-    private final boolean hasJei = Loader.isModLoaded("jei");
+    private final boolean hasJei = Loader.isModLoaded("jei") || Loader.isModLoaded("hei");
     private Method installJei;
-    private long jeiRetryAt;
+    private final IntegrationRetry jeiRetry = new IntegrationRetry();
     private Method refreshCreative;
     private Field creativeSearchField;
     private Field creativeScrollField;
@@ -121,7 +121,7 @@ public final class SearchHook {
     }
 
     private void installJeiHook() {
-        if (!hasJei || System.nanoTime() < jeiRetryAt) {
+        if (!hasJei || !jeiRetry.ready(System.nanoTime())) {
             return;
         }
         try {
@@ -130,11 +130,13 @@ public final class SearchHook {
                         .getMethod("install");
             }
             installJei.invoke(null);
+            jeiRetry.succeeded();
         } catch (Exception | LinkageError t) {
-            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(t);
-            jeiRetryAt = System.nanoTime() + 5_000_000_000L;
-            BetterSearch.LOGGER.warn("[{}] could not hook JEI: {}",
-                    BetterSearch.MOD_NAME, t.toString());
+            if (jeiRetry.failed(t, System.nanoTime())) {
+                BetterSearch.LOGGER.warn("[{}] JEI/HEI integration {}: {}",
+                        BetterSearch.MOD_NAME, jeiRetry.disabled() ? "unavailable" : "deferred",
+                        IntegrationRetry.cause(t).toString());
+            }
         }
     }
 }

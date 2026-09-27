@@ -21,6 +21,8 @@ def coreTestDir = layout.buildDirectory.dir('coreTest')
 def lifecycleTestDir = layout.buildDirectory.dir('lifecycleTest')
 def enterTestDir = layout.buildDirectory.dir('enterTest')
 
+def latinTestDir = layout.buildDirectory.dir('latinTest')
+
 tasks.register('compileCoreTest', JavaCompile) {
     group = 'verification'
     source = fileTree('core/src/main/java/com/rivalzin/bettersearch/core') + files('tools/BetterSearchCoreTest.java')
@@ -91,9 +93,32 @@ tasks.register('enterTest', JavaExec) {
     jvmArgs '-Dfile.encoding=UTF-8'
 }
 
+tasks.register('compileLatinTest', JavaCompile) {
+    group = 'verification'
+    dependsOn 'compileCoreTest'
+    source = files('tools/latin/BetterSearchLatinTest.java')
+    classpath = files(coreTestDir)
+    destinationDirectory = latinTestDir
+    options.encoding = 'UTF-8'
+    sourceCompatibility = '8'
+    targetCompatibility = '8'
+    options.release = 8
+}
+
+tasks.register('latinTest', JavaExec) {
+    group = 'verification'
+    dependsOn 'compileLatinTest'
+    classpath = files(coreTestDir, latinTestDir)
+    mainClass = 'com.rivalzin.bettersearch.tools.BetterSearchLatinTest'
+    jvmArgs '-Dfile.encoding=UTF-8'
+}
+
 tasks.named('check') {
     if (file('tools/BetterSearchCoreTest.java').isFile()) {
         dependsOn 'coreTest', 'asyncTest', 'stateTest', 'failurePolicyTest', 'enterTest'
+    }
+    if (file('tools/latin/BetterSearchLatinTest.java').isFile()) {
+        dependsOn 'latinTest'
     }
 }
 

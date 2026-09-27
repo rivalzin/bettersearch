@@ -8,7 +8,7 @@ import java.util.List;
 public final class SearchSettings {
     public static final List<String> DEFAULT_LANGUAGES = Collections.unmodifiableList(Arrays.asList(
             "en_us", "es_es", "es_mx", "pt_br", "pt_pt", "fr_fr", "de_de", "it_it",
-            "nl_nl", "pl_pl", "ru_ru", "uk_ua", "tr_tr", "sv_se",
+            "nl_nl", "pl_pl", "ru_ru", "uk_ua", "tr_tr", "sv_se", "la_la",
             "zh_cn", "zh_tw", "ja_jp", "ko_kr"));
 
     public boolean enabled = true;

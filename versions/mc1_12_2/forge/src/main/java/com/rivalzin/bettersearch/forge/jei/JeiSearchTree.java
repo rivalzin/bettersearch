@@ -2,23 +2,22 @@ package com.rivalzin.bettersearch.forge.jei;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
-import mezz.jei.ingredients.IngredientFilter;
 import mezz.jei.suffixtree.CombinedSearchTrees;
 import mezz.jei.suffixtree.ISearchTree;
 
 final class JeiSearchTree extends CombinedSearchTrees {
     private final CombinedSearchTrees original;
-    private final IngredientFilter filter;
+    private final JeiSearchBridge bridge;
 
-    JeiSearchTree(CombinedSearchTrees original, IngredientFilter filter) {
+    JeiSearchTree(CombinedSearchTrees original, JeiSearchBridge.Elements elements) {
         this.original = original;
-        this.filter = filter;
+        this.bridge = new JeiSearchBridge(elements);
     }
 
     @Override
     public IntSet search(String word) {
         IntSet theirs = original.search(word);
-        int[] ours = JeiSearchBridge.search(word, filter);
+        int[] ours = bridge.search(word);
         if (ours == null || ours.length == 0) {
             return theirs;
         }

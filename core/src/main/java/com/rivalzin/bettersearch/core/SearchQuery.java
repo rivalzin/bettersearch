@@ -10,6 +10,10 @@ public final class SearchQuery {
 
     public final long[] tokenMasks;
 
+    final long combinedMask;
+
+    final boolean canMatchTypos;
+
     public final String[] modFilters;
 
     public final int[] maxDistances;
@@ -18,6 +22,14 @@ public final class SearchQuery {
         this.raw = raw;
         this.tokens = tokens;
         this.tokenMasks = masks;
+        long combined = 0;
+        boolean typos = false;
+        for (int i = 0; i < masks.length; i++) {
+            combined |= masks[i];
+            typos |= maxDistances[i] > 0;
+        }
+        this.combinedMask = combined;
+        this.canMatchTypos = typos;
         this.maxDistances = maxDistances;
         this.modFilters = modFilters;
     }

@@ -2,6 +2,7 @@ package com.rivalzin.bettersearch.forge.jei;
 
 import com.rivalzin.bettersearch.BetterSearch;
 import com.rivalzin.bettersearch.FailurePolicy;
+import com.rivalzin.bettersearch.forge.IntegrationRetry;
 import com.rivalzin.bettersearch.async.AsyncIndexState;
 import com.rivalzin.bettersearch.async.EntrySnapshot;
 import com.rivalzin.bettersearch.client.ModConfig;
@@ -11,42 +12,60 @@ import com.rivalzin.bettersearch.core.SearchIndex;
 import com.rivalzin.bettersearch.core.SearchQuery;
 import com.rivalzin.bettersearch.core.SearchSettings;
 import mezz.jei.gui.ingredients.IIngredientListElement;
-import mezz.jei.ingredients.IngredientFilter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 
 public final class JeiSearchBridge {
     private static final int MAX_TOOLTIP_LINES = 6;
-    private static final AsyncIndexState<SearchIndex<Integer>> INDEX = new AsyncIndexState<>(
+    private final AsyncIndexState<SearchIndex<Integer>> index = new AsyncIndexState<>(
             task -> Minecraft.getMinecraft().addScheduledTask(task), ForkJoinPool.commonPool(),
             task -> Minecraft.getMinecraft().addScheduledTask(task),
-            error -> BetterSearch.LOGGER.error("[{}] JEI index failed, falling back", BetterSearch.MOD_NAME, error));
+            this::reportFailure);
     private static volatile int generation;
-    private static Field itemListField;
-    private static Context context;
-    private static volatile Cache cache;
+    private final Elements source;
+    private final IntegrationRetry retry = new IntegrationRetry();
+    private Context context;
+    private volatile Cache cache;
 
-    private JeiSearchBridge() {
+    interface Elements {
+        List<?> get() throws Exception;
+    }
+
+    JeiSearchBridge(Elements source) {
+        this.source = source;
+    }
+
+    synchronized void invalidate() {
+        index.invalidate();
+        context = null;
+        cache = null;
+    }
+
+    private void reportFailure(Throwable error) {
+        if (retry.failed(error, System.nanoTime())) {
+            BetterSearch.LOGGER.warn("[{}] JEI/HEI search unavailable, using native search: {}",
+                    BetterSearch.MOD_NAME, IntegrationRetry.cause(error).toString());
+        }
     }
 
     static int generation() {
         return generation;
     }
 
-    static int[] search(String word, IngredientFilter filter) {
+    synchronized int[] search(String word) {
         SearchSettings settings = ModConfig.settings();
-        if (word == null || word.isEmpty() || !settings.enabled || !settings.searchJei) {
+        if (word == null || word.isEmpty() || !settings.enabled || !settings.searchJei
+                || !retry.ready(System.nanoTime())) {
             return null;
         }
         try {
-            SearchIndex<Integer> current = ensureIndex(filter, settings);
+            SearchIndex<Integer> current = ensureIndex(settings);
             if (current == null) {
                 return null;
             }
@@ -63,37 +82,45 @@ public final class JeiSearchBridge {
             for (int i = 0; i < result.length; i++) {
                 result[i] = found.get(i);
             }
-            cache = new Cache(current, word, result);
+            cache = new Cache(current, context.elements, word, result);
             return result;
         } catch (Exception | LinkageError error) {
             FailurePolicy.rethrowFatal(error);
-            BetterSearch.LOGGER.error("[{}] JEI search failed, falling back", BetterSearch.MOD_NAME, error);
+            reportFailure(error);
             return null;
         }
     }
 
-    private static synchronized SearchIndex<Integer> ensureIndex(IngredientFilter filter,
-                                                                  SearchSettings settings) throws Exception {
-        LangTable.ensure(settings);
-        if (itemListField == null) {
-            itemListField = IngredientFilter.class.getDeclaredField("elementList");
-            itemListField.setAccessible(true);
+    synchronized List<Object> searchElements(String word) {
+        int[] positions = search(word);
+        List<Object> found = new ArrayList<>();
+        Cache cached = cache;
+        if (positions == null || cached == null || cached.result != positions) {
+            return found;
         }
-        List<?> list = (List<?>) itemListField.get(filter);
+        for (int position : positions) {
+            found.add(cached.elements.get(position));
+        }
+        return found;
+    }
+
+    private synchronized SearchIndex<Integer> ensureIndex(SearchSettings settings) throws Exception {
+        LangTable.ensure(settings);
+        List<?> list = source.get();
         if (list == null) {
             return null;
         }
         String language = Minecraft.getMinecraft().gameSettings.language;
         int configStamp = ModConfig.stamp();
         int languageStamp = LangTable.stamp();
-        if (context == null || context.filter != filter || context.configStamp != configStamp
+        if (context == null || context.elements != list || context.configStamp != configStamp
                 || context.languageStamp != languageStamp || !context.language.equals(language)) {
-            context = new Context(filter, language, configStamp, languageStamp);
-            INDEX.invalidate();
+            context = new Context(list, language, configStamp, languageStamp);
+            index.invalidate();
             cache = null;
         }
         Context key = context;
-        return INDEX.getPrepared(key, list.size(), 0L, () -> {
+        return index.getPrepared(key, list.size(), 0L, () -> {
             List<?> elements = new ArrayList<>(list);
             List<Integer> positions = new ArrayList<>(elements.size());
             for (int i = 0; i < elements.size(); i++) {
@@ -111,17 +138,20 @@ public final class JeiSearchBridge {
                     return null;
                 }
             });
-        }, () -> generation++);
+        }, () -> {
+            retry.succeeded();
+            generation++;
+        });
     }
 
     private static final class Context {
-        final IngredientFilter filter;
+        final List<?> elements;
         final String language;
         final int configStamp;
         final int languageStamp;
 
-        Context(IngredientFilter filter, String language, int configStamp, int languageStamp) {
-            this.filter = filter;
+        Context(List<?> elements, String language, int configStamp, int languageStamp) {
+            this.elements = elements;
             this.language = language;
             this.configStamp = configStamp;
             this.languageStamp = languageStamp;
@@ -130,11 +160,13 @@ public final class JeiSearchBridge {
 
     private static final class Cache {
         final SearchIndex<Integer> index;
+        final List<?> elements;
         final String word;
         final int[] result;
 
-        Cache(SearchIndex<Integer> index, String word, int[] result) {
+        Cache(SearchIndex<Integer> index, List<?> elements, String word, int[] result) {
             this.index = index;
+            this.elements = elements;
             this.word = word;
             this.result = result;
         }

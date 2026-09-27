@@ -145,12 +145,12 @@ public final class SearchIndex<T> {
         final MatchPolicy strict = MatchPolicy.of(settings, false);
         final MatchPolicy fuzzy = MatchPolicy.of(settings, true);
 
-        int hits = scan(query, settings, scratch, scores, strict, strict);
+        int hits = scan(query, settings, scratch, scores, strict, strict, false);
 
         boolean wantsTypos = settings.typoTolerance > 0;
-        if (wantsTypos && hits < settings.fuzzyThreshold) {
+        if (wantsTypos && query.canMatchTypos && hits < settings.fuzzyThreshold) {
             hits += scan(query, settings, scratch, scores,
-                    fuzzy, settings.foreignStrictOnly ? strict : fuzzy);
+                    fuzzy, settings.foreignStrictOnly ? strict : fuzzy, true);
         }
         if (settings.crossFieldMatching && query.tokens.length >= 2 && hits < settings.crossFieldThreshold) {
             hits += scanCrossField(query, settings, scratch, scores,
@@ -264,7 +264,7 @@ public final class SearchIndex<T> {
     }
 
     private int scan(SearchQuery query, SearchSettings settings, FuzzyMatcher.Scratch scratch,
-                     int[] scores, MatchPolicy policy, MatchPolicy foreignPolicy) {
+                     int[] scores, MatchPolicy policy, MatchPolicy foreignPolicy, boolean strictPassCompleted) {
         MatchPolicy strict = MatchPolicy.of(settings, false);
         int found = 0;
         for (int i = 0; i < entries.size(); i++) {
@@ -298,6 +298,9 @@ public final class SearchIndex<T> {
                         default:
                             fieldPolicy = strict;
                             break;
+                    }
+                    if (strictPassCompleted && !fieldPolicy.allowTypos()) {
+                        continue;
                     }
                     int score = scoreField(field, query, fieldPolicy, scratch);
                     if (score > best) {
