@@ -115,5 +115,13 @@
   "bettersearch.key.alt": "Alt + %s",
   "bettersearch.config.search_toms_storage": "Terminali di Tom's Storage",
   "bettersearch.config.search_toms_storage.desc": "Migliora la ricerca degli oggetti nei terminali di Tom's Storage.",
-  "bettersearch.config.search_toms_storage.tip": "Aggiunge tolleranza agli errori e le lingue attive. Tom's Storage mantiene filtri, espressioni regolari, ordinamento e tutti gli oggetti conservati corrispondenti."
+  "bettersearch.config.search_toms_storage.tip": "Aggiunge tolleranza agli errori e le lingue attive. Tom's Storage mantiene filtri, espressioni regolari, ordinamento e tutti gli oggetti conservati corrispondenti.",
+  "bettersearch.config.integrations_search": "Mod di ricerca",
+  "bettersearch.config.integrations_search.desc": "Integrazioni con mod di ricerca e visualizzatori di ricette.",
+  "bettersearch.config.integrations_search.tip": "Fai clic per mostrare o nascondere le opzioni delle mod di ricerca.",
+  "bettersearch.config.integrations_other": "Altre mod",
+  "bettersearch.config.integrations_other.desc": "Integrazioni con terminali di deposito e altre mod.",
+  "bettersearch.config.integrations_other.tip": "Fai clic per mostrare o nascondere le opzioni delle altre mod.",
+  "bettersearch.config.category.expanded": "Espanso",
+  "bettersearch.config.category.collapsed": "Compresso"
 }

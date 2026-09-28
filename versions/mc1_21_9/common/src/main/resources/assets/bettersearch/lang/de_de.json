@@ -112,5 +112,13 @@
   "bettersearch.config.value.ratio": "%s / %s",
   "key.category.bettersearch.main": "Better Search",
   "key.bettersearch.open_config": "Better-Search-Einstellungen öffnen",
-  "bettersearch.key.alt": "Alt + %s"
+  "bettersearch.key.alt": "Alt + %s",
+  "bettersearch.config.integrations_search": "Suchmods",
+  "bettersearch.config.integrations_search.desc": "Integrationen für Suchmods und Rezeptanzeigen.",
+  "bettersearch.config.integrations_search.tip": "Klicken, um die Optionen der Suchmods ein- oder auszublenden.",
+  "bettersearch.config.integrations_other": "Weitere Mods",
+  "bettersearch.config.integrations_other.desc": "Integrationen für Lagerterminals und weitere Mods.",
+  "bettersearch.config.integrations_other.tip": "Klicken, um die Optionen weiterer Mods ein- oder auszublenden.",
+  "bettersearch.config.category.expanded": "Ausgeklappt",
+  "bettersearch.config.category.collapsed": "Eingeklappt"
 }

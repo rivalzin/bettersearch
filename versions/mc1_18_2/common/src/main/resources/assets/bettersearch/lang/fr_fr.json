@@ -118,5 +118,13 @@
   "bettersearch.config.search_toms_storage.tip": "Ajoute la tolérance aux fautes et les langues activées. Tom's Storage conserve ses filtres, expressions régulières, tri et tous les objets stockés correspondants.",
   "bettersearch.config.search_ae2": "Terminaux Applied Energistics 2",
   "bettersearch.config.search_ae2.desc": "Améliore les recherches dans les terminaux AE2 compatibles.",
-  "bettersearch.config.search_ae2.tip": "Ajoute la tolérance aux fautes et les langues activées aux recherches d’objets, de fluides et de modèles. AE2 conserve ses filtres, sa syntaxe de recherche, son tri et tous les résultats correspondants. Nécessite une version compatible d’AE2."
+  "bettersearch.config.search_ae2.tip": "Ajoute la tolérance aux fautes et les langues activées aux recherches d’objets, de fluides et de modèles. AE2 conserve ses filtres, sa syntaxe de recherche, son tri et tous les résultats correspondants. Nécessite une version compatible d’AE2.",
+  "bettersearch.config.integrations_search": "Mods de recherche",
+  "bettersearch.config.integrations_search.desc": "Intégrations aux moteurs de recherche et aux catalogues de recettes.",
+  "bettersearch.config.integrations_search.tip": "Cliquez pour afficher ou masquer les options des mods de recherche.",
+  "bettersearch.config.integrations_other": "Autres mods",
+  "bettersearch.config.integrations_other.desc": "Intégrations aux terminaux de stockage et aux autres mods.",
+  "bettersearch.config.integrations_other.tip": "Cliquez pour afficher ou masquer les options des autres mods.",
+  "bettersearch.config.category.expanded": "Développé",
+  "bettersearch.config.category.collapsed": "Réduit"
 }

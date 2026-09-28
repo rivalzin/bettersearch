@@ -118,5 +118,13 @@
   "bettersearch.config.search_toms_storage.tip": "Adds typo tolerance and enabled languages. Tom's Storage keeps its filters, regular expressions, sorting and all matching stored items.",
   "bettersearch.config.search_ae2": "Applied Energistics 2 terminals",
   "bettersearch.config.search_ae2.desc": "Enhances searches in supported AE2 terminals.",
-  "bettersearch.config.search_ae2.tip": "Adds typo tolerance and enabled languages to item, fluid and pattern searches. AE2 keeps its filters, query syntax, sorting and all matching results. Requires a compatible AE2 version."
+  "bettersearch.config.search_ae2.tip": "Adds typo tolerance and enabled languages to item, fluid and pattern searches. AE2 keeps its filters, query syntax, sorting and all matching results. Requires a compatible AE2 version.",
+  "bettersearch.config.integrations_search": "Search mods",
+  "bettersearch.config.integrations_search.desc": "Search and recipe browser integrations.",
+  "bettersearch.config.integrations_search.tip": "Click to expand or collapse search mod options.",
+  "bettersearch.config.integrations_other": "Other mods",
+  "bettersearch.config.integrations_other.desc": "Storage terminals and other mod integrations.",
+  "bettersearch.config.integrations_other.tip": "Click to expand or collapse other mod options.",
+  "bettersearch.config.category.expanded": "Expanded",
+  "bettersearch.config.category.collapsed": "Collapsed"
 }

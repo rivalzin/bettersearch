@@ -112,5 +112,13 @@
   "bettersearch.config.value.ratio": "%s / %s",
   "key.category.bettersearch.main": "Better Search",
   "key.bettersearch.open_config": "Open Better Search settings",
-  "bettersearch.key.alt": "Alt + %s"
+  "bettersearch.key.alt": "Alt + %s",
+  "bettersearch.config.integrations_search": "Search mods",
+  "bettersearch.config.integrations_search.desc": "Search and recipe browser integrations.",
+  "bettersearch.config.integrations_search.tip": "Click to expand or collapse search mod options.",
+  "bettersearch.config.integrations_other": "Other mods",
+  "bettersearch.config.integrations_other.desc": "Storage terminals and other mod integrations.",
+  "bettersearch.config.integrations_other.tip": "Click to expand or collapse other mod options.",
+  "bettersearch.config.category.expanded": "Expanded",
+  "bettersearch.config.category.collapsed": "Collapsed"
 }

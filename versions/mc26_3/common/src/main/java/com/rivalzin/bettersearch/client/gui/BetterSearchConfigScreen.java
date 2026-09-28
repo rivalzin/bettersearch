@@ -32,6 +32,8 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
     private final SearchSettings settings;
     private final SearchSettings opened;
     private Tab tab = Tab.GENERAL;
+    private boolean searchModsExpanded;
+    private boolean otherModsExpanded;
 
     private Button defaultsButton;
     private Button undoButton;
@@ -158,17 +160,27 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
                 addToggle("search_command_items", () -> settings.searchCommandItems,
                         v -> settings.searchCommandItems = v, DEFAULTS.searchCommandItems)
                         .preview(previewOf("search_command_items"));
-                addToggle("search_jei", () -> settings.searchJei,
-                        v -> settings.searchJei = v, DEFAULTS.searchJei)
-                        .preview(previewOf("search_jei"));
-                addToggle("search_emi", () -> settings.searchEmi,
-                        v -> settings.searchEmi = v, DEFAULTS.searchEmi)
-                        .preview(previewOf("search_emi"));
-                addToggle("search_toms_storage", () -> settings.searchTomsStorage,
-                        v -> settings.searchTomsStorage = v, DEFAULTS.searchTomsStorage);
-                addToggle("search_rei", () -> settings.searchRei,
-                        v -> settings.searchRei = v, DEFAULTS.searchRei)
-                        .preview(previewOf("search_rei"));
+                if (addCategory("integrations_search", () -> searchModsExpanded,
+                        value -> searchModsExpanded = value)) {
+                    addToggle("search_jei", () -> settings.searchJei,
+                            v -> settings.searchJei = v, DEFAULTS.searchJei)
+                            .preview(previewOf("search_jei"))
+                            .icons(modIcon("jei"));
+                    addToggle("search_emi", () -> settings.searchEmi,
+                            v -> settings.searchEmi = v, DEFAULTS.searchEmi)
+                            .preview(previewOf("search_emi"))
+                            .icons(modIcon("emi"));
+                    addToggle("search_rei", () -> settings.searchRei,
+                            v -> settings.searchRei = v, DEFAULTS.searchRei)
+                            .preview(previewOf("search_rei"))
+                            .icons(modIcon("rei"));
+                }
+                if (addCategory("integrations_other", () -> otherModsExpanded,
+                        value -> otherModsExpanded = value)) {
+                    addToggle("search_toms_storage", () -> settings.searchTomsStorage,
+                            v -> settings.searchTomsStorage = v, DEFAULTS.searchTomsStorage)
+                            .icons(modIcon("toms_storage"));
+                }
                 addSlider("command_suggestion_limit", 1, SUGGESTION_LIMIT_MAX, 1,
                         () -> settings.commandSuggestionLimit,
                         v -> settings.commandSuggestionLimit = v, DEFAULTS.commandSuggestionLimit,

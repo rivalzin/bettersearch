@@ -33,6 +33,8 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
     private final SearchSettings settings;
     private final SearchSettings opened;
     private Tab tab = Tab.GENERAL;
+    private boolean searchIntegrationsExpanded;
+    private boolean otherIntegrationsExpanded;
 
     private GuiButton defaultsButton;
     private GuiButton undoButton;
@@ -152,11 +154,20 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
                         v -> settings.searchRecipeBook = v, DEFAULTS.searchRecipeBook)
                         .preview(previewOf("search_recipe_book"));
 
-                addToggle("search_ae2", () -> settings.searchAe2,
-                        v -> settings.searchAe2 = v, DEFAULTS.searchAe2);
-                addToggle("search_jei", () -> settings.searchJei,
-                        v -> settings.searchJei = v, DEFAULTS.searchJei)
-                        .preview(previewOf("search_jei"));
+
+                if (addCategory("integrations_search", () -> searchIntegrationsExpanded,
+                        value -> searchIntegrationsExpanded = value)) {
+                    addToggle("search_jei", () -> settings.searchJei,
+                            v -> settings.searchJei = v, DEFAULTS.searchJei)
+                            .preview(previewOf("search_jei"))
+                            .icons(modIcon("jei"), modIcon("hei"), modIcon("nei"));
+                }
+                if (addCategory("integrations_other", () -> otherIntegrationsExpanded,
+                        value -> otherIntegrationsExpanded = value)) {
+                    addToggle("search_ae2", () -> settings.searchAe2,
+                            v -> settings.searchAe2 = v, DEFAULTS.searchAe2)
+                            .icons(modIcon("ae2"));
+                }
             }
             break;
         }

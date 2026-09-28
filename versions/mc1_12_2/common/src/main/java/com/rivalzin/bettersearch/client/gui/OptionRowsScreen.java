@@ -42,6 +42,8 @@ public abstract class OptionRowsScreen extends GuiScreen {
         final GuiButton reset;
         final BooleanSupplier modified;
         ResourceLocation preview;
+        ResourceLocation[] icons = new ResourceLocation[0];
+        String categoryKey;
         int y;
 
         Row(String title, String description, GuiButton control,
@@ -51,6 +53,11 @@ public abstract class OptionRowsScreen extends GuiScreen {
             this.control = control;
             this.reset = reset;
             this.modified = modified;
+        }
+
+        public Row icons(ResourceLocation... textures) {
+            this.icons = textures.clone();
+            return this;
         }
 
         public Row preview(ResourceLocation texture) {
@@ -81,6 +88,8 @@ public abstract class OptionRowsScreen extends GuiScreen {
     private Row hoveredRow;
 
     private Row panelRow;
+    private String pendingCategoryFocus;
+    private GuiButton keyboardFocus;
     private boolean rebuildQueued;
 
     protected OptionRowsScreen(String title, GuiScreen parent) {
@@ -124,6 +133,7 @@ public abstract class OptionRowsScreen extends GuiScreen {
 
     @Override
     public void initGui() {
+        keyboardFocus = null;
         rows.clear();
         hoveredRow = null;
         panelRow = null;
@@ -146,6 +156,7 @@ public abstract class OptionRowsScreen extends GuiScreen {
         buildRows();
         buildPanelFooter();
         layoutRows();
+        restoreCategoryFocus();
         measurePreview();
     }
 
@@ -197,12 +208,44 @@ public abstract class OptionRowsScreen extends GuiScreen {
         return listX + barWidth - 6 - width;
     }
 
+    protected static ResourceLocation modIcon(String id) {
+        return new ResourceLocation("bettersearch", "textures/gui/mods/" + id + ".png");
+    }
+
     protected static ResourceLocation previewOf(String key) {
         return new ResourceLocation("bettersearch", "textures/gui/options/" + key + ".png");
     }
 
     private static void attachTip(GuiButton control, String key) {
         Tips.set(control, ComponentCompat.translatable(KEY_PREFIX + key + ".tip"));
+    }
+
+    protected final boolean addCategory(String key, BooleanSupplier expanded, Consumer<Boolean> setter) {
+        String title = ComponentCompat.translatable(KEY_PREFIX + key);
+        CategoryButton control = new CategoryButton(listX, 0, listWidth - SCROLLBAR_GUTTER,
+                title, expanded, () -> {
+                    setter.accept(!expanded.getAsBoolean());
+                    pendingCategoryFocus = key;
+                    rebuildWidgets();
+                });
+        attachTip(control, key);
+        Row row = addRow(title, ComponentCompat.translatable(KEY_PREFIX + key + ".desc"), control, null, null);
+        row.categoryKey = key;
+        return expanded.getAsBoolean();
+    }
+
+    private void restoreCategoryFocus() {
+        if (pendingCategoryFocus == null) {
+            return;
+        }
+        for (Row row : rows) {
+            if (pendingCategoryFocus.equals(row.categoryKey) && row.control.visible) {
+                keyboardFocus = row.control;
+                panelRow = row;
+                break;
+            }
+        }
+        pendingCategoryFocus = null;
     }
 
     protected final Row addToggle(String key, BooleanSupplier getter, Consumer<Boolean> setter, boolean defaultValue) {
@@ -284,6 +327,9 @@ public abstract class OptionRowsScreen extends GuiScreen {
             boolean shown = slot >= 0 && slot < visibleRows;
             row.y = contentTop + slot * ROW_HEIGHT;
             row.control.visible = shown;
+            if (!shown && (keyboardFocus == row.control || keyboardFocus == row.reset)) {
+                keyboardFocus = null;
+            }
             row.control.y = row.y + (ROW_HEIGHT - row.control.height) / 2;
             if (row.reset != null) {
                 row.reset.visible = shown;
@@ -305,7 +351,52 @@ public abstract class OptionRowsScreen extends GuiScreen {
             onClose();
             return;
         }
+        if (keyCode == 15) {
+            cycleKeyboardFocus(isShiftKeyDown() ? -1 : 1);
+            return;
+        }
+        if ((keyCode == 28 || keyCode == 156 || keyCode == 57) && keyboardFocus != null
+                && keyboardFocus.visible && keyboardFocus.enabled && keyboardFocus instanceof Pressable) {
+            actionPerformed(keyboardFocus);
+            return;
+        }
         super.keyTyped(typedChar, keyCode);
+    }
+
+    private void cycleKeyboardFocus(int direction) {
+        List<GuiButton> candidates = new ArrayList<GuiButton>();
+        for (Object raw : this.buttonList) {
+            GuiButton button = (GuiButton) raw;
+            if (button.visible && button.enabled && button instanceof Pressable) {
+                candidates.add(button);
+            }
+        }
+        if (candidates.isEmpty()) {
+            keyboardFocus = null;
+            return;
+        }
+        int index = candidates.indexOf(keyboardFocus);
+        if (index < 0) {
+            index = direction > 0 ? 0 : candidates.size() - 1;
+        } else {
+            index = (index + direction + candidates.size()) % candidates.size();
+        }
+        keyboardFocus = candidates.get(index);
+    }
+
+    private void renderKeyboardFocus() {
+        if (keyboardFocus == null || !keyboardFocus.visible || !keyboardFocus.enabled) {
+            keyboardFocus = null;
+            return;
+        }
+        int left = keyboardFocus.x - 1;
+        int top = keyboardFocus.y - 1;
+        int right = left + keyboardFocus.width + 2;
+        int bottom = top + keyboardFocus.height + 2;
+        Gui.drawRect(left, top, right, top + 1, Theme.ACCENT);
+        Gui.drawRect(left, bottom - 1, right, bottom, Theme.ACCENT);
+        Gui.drawRect(left, top, left + 1, bottom, Theme.ACCENT);
+        Gui.drawRect(right - 1, top, right, bottom, Theme.ACCENT);
     }
 
     @Override
@@ -414,6 +505,17 @@ public abstract class OptionRowsScreen extends GuiScreen {
         if (beginScrollbarDrag(mouseX, mouseY, mouseButton)) {
             return;
         }
+        if (mouseButton == 0) {
+            keyboardFocus = null;
+            for (Object raw : this.buttonList) {
+                GuiButton button = (GuiButton) raw;
+                if (button.visible && button.enabled && mouseX >= button.x && mouseY >= button.y
+                        && mouseX < button.x + button.width && mouseY < button.y + button.height) {
+                    keyboardFocus = button;
+                    break;
+                }
+            }
+        }
         super.mouseClicked(mouseX, mouseY, mouseButton);
     }
 
@@ -450,6 +552,7 @@ public abstract class OptionRowsScreen extends GuiScreen {
         renderRows();
         renderPanel();
         super.drawScreen(mouseX, mouseY, partialTicks);
+        renderKeyboardFocus();
         drawExtraWidgets(mouseX, mouseY, partialTicks);
         renderScrollbar(mouseX, mouseY);
         renderTip(mouseX, mouseY);
@@ -492,15 +595,22 @@ public abstract class OptionRowsScreen extends GuiScreen {
         }
         if (hoveredRow != null) {
             panelRow = hoveredRow;
-        } else if (panelRow != null && !panelRow.control.visible) {
-            panelRow = null;
+        } else {
+            if (panelRow != null && !panelRow.control.visible) {
+                panelRow = null;
+            }
+            for (Row row : rows) {
+                if (row.control.visible && (keyboardFocus == row.control || keyboardFocus == row.reset)) {
+                    panelRow = row;
+                    break;
+                }
+            }
         }
     }
 
     private void renderRows() {
-        int labelLimit = barWidth - 14 - Math.max(ToggleSwitch.WIDTH, sliderWidth);
         for (Row row : rows) {
-            if (!row.control.visible) {
+            if (!row.control.visible || row.categoryKey != null) {
                 continue;
             }
             int top = row.y;
@@ -511,9 +621,26 @@ public abstract class OptionRowsScreen extends GuiScreen {
                 Gui.drawRect(listX, top, listX + 2, bottom, Theme.ACCENT);
             }
 
+            int labelX = listX + 8;
+            int labelRight = row.control.x - 6;
+            int iconCount = Math.min(row.icons.length, Math.max(0, (labelRight - labelX - 20) / 20));
+            for (int i = 0; i < iconCount; i++) {
+                renderIcon(row.icons[i], labelX, top + 3);
+                labelX += 20;
+            }
+            int labelLimit = Math.max(0, labelRight - labelX);
             this.fontRenderer.drawStringWithShadow(ellipsize(row.title, labelLimit),
-                    listX + 8, top + (ROW_HEIGHT - 2 - 8) / 2, hovered ? Theme.TITLE : Theme.TEXT);
+                    labelX, top + (ROW_HEIGHT - 2 - 8) / 2, hovered ? Theme.TITLE : Theme.TEXT);
         }
+    }
+
+    private void renderIcon(ResourceLocation texture, int x, int y) {
+        GlStateManager.enableBlend();
+        GlStateManager.tryBlendFuncSeparate(770, 771, 1, 0);
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        this.mc.getTextureManager().bindTexture(texture);
+        Gui.drawScaledCustomSizeModalRect(x, y, 0.0F, 0.0F, 64, 64, 16, 16, 64, 64);
+        GlStateManager.disableBlend();
     }
 
     private void renderPanel() {
@@ -603,7 +730,10 @@ public abstract class OptionRowsScreen extends GuiScreen {
     }
 
     private String ellipsize(String text, int maxWidth) {
-        int limit = Math.max(16, maxWidth);
+        int limit = Math.max(0, maxWidth);
+        if (limit <= this.fontRenderer.getStringWidth("...")) {
+            return this.fontRenderer.trimStringToWidth(text, limit);
+        }
         if (this.fontRenderer.getStringWidth(text) <= limit) {
             return text;
         }

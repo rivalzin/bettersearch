@@ -34,6 +34,8 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen implements 
     private final SearchSettings settings;
     private final SearchSettings opened;
     private Tab tab = Tab.GENERAL;
+    private boolean searchIntegrationsExpanded;
+    private boolean otherIntegrationsExpanded;
 
     private GuiButton defaultsButton;
     private GuiButton undoButton;
@@ -150,11 +152,20 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen implements 
                         v -> settings.searchCreative = v, DEFAULTS.searchCreative)
                         .preview(previewOf("search_creative"));
 
-                addToggle("search_ae2", () -> settings.searchAe2,
-                        v -> settings.searchAe2 = v, DEFAULTS.searchAe2);
-                addToggle("search_jei", () -> settings.searchJei,
-                        v -> settings.searchJei = v, DEFAULTS.searchJei)
-                        .preview(previewOf("search_nei"));
+
+                if (addCategory("integrations_search", () -> searchIntegrationsExpanded,
+                        value -> searchIntegrationsExpanded = value)) {
+                    addToggle("search_jei", () -> settings.searchJei,
+                            v -> settings.searchJei = v, DEFAULTS.searchJei)
+                            .preview(previewOf("search_nei"))
+                            .icons(modIcon("nei"));
+                }
+                if (addCategory("integrations_other", () -> otherIntegrationsExpanded,
+                        value -> otherIntegrationsExpanded = value)) {
+                    addToggle("search_ae2", () -> settings.searchAe2,
+                            v -> settings.searchAe2 = v, DEFAULTS.searchAe2)
+                            .icons(modIcon("ae2"));
+                }
             }
             break;
         }
