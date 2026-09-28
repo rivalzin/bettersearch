@@ -3,6 +3,7 @@ package com.rivalzin.bettersearch.forge;
 import com.rivalzin.bettersearch.BetterSearch;
 import com.rivalzin.bettersearch.client.ModConfig;
 import cpw.mods.fml.common.FMLCommonHandler;
+import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.relauncher.Side;
@@ -17,7 +18,7 @@ public final class BetterSearchForge {
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
         ModConfig.load(new java.io.File(event.getModConfigurationDirectory(),
-                "bettersearch.json").toPath());
+                "bettersearch.json").toPath(), loadedModCount());
         if (FMLCommonHandler.instance().getSide() == Side.CLIENT) {
 
             MinecraftForge.EVENT_BUS.register(new SearchHook());
@@ -27,5 +28,14 @@ public final class BetterSearchForge {
             BetterSearch.LOGGER.info("[{}] loaded (1.7.10), log backend: {}",
                     BetterSearch.MOD_NAME, BetterSearch.LOGGER.backend());
         }
+    }
+
+    private static int loadedModCount() {
+        return (int) Loader.instance().getActiveModList().stream()
+                .filter(mod -> !"minecraft".equalsIgnoreCase(mod.getModId())
+                        && !"mcp".equalsIgnoreCase(mod.getModId())
+                        && !"FML".equalsIgnoreCase(mod.getModId())
+                        && !"Forge".equalsIgnoreCase(mod.getModId()))
+                .count();
     }
 }

@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Locale;
 import java.util.Map;
 
 public final class ConfigIo {
@@ -56,9 +57,21 @@ public final class ConfigIo {
     }
 
     public static SearchSettings loadOrCreate(Path file) {
+        return loadOrCreate(file, 0);
+    }
+
+    public static SearchSettings loadOrCreate(Path file, int loadedModCount) {
+        return loadOrCreate(file, loadedModCount, Locale.getDefault(Locale.Category.DISPLAY));
+    }
+
+    public static SearchSettings loadOrCreate(Path file, int loadedModCount, Locale computerLocale) {
         SearchSettings settings = new SearchSettings();
         boolean rewrite = true;
-        if (!Files.notExists(file)) {
+        boolean missing = Files.notExists(file);
+        if (missing && loadedModCount > 64) {
+            settings.languages = FirstBootLanguages.forLocale(computerLocale);
+        }
+        if (!missing) {
             try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
                 JsonElement parsed = new JsonParser().parse(reader);
                 if (parsed != null && parsed.isJsonObject()) {

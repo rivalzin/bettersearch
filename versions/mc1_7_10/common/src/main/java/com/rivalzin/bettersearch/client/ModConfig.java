@@ -22,8 +22,12 @@ public final class ModConfig {
     }
 
     public static synchronized void load(Path path) {
+        load(path, 0);
+    }
+
+    public static synchronized void load(Path path, int loadedModCount) {
         file = path;
-        SearchSettings loaded = ConfigIo.loadOrCreate(path);
+        SearchSettings loaded = ConfigIo.loadOrCreate(path, loadedModCount);
         if (loaded != null) {
             loaded = loaded.copy();
             loaded.sanitize();

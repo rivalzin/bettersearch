@@ -16,7 +16,7 @@ public final class BetterSearchFabric implements ClientModInitializer {
     public void onInitializeClient() {
         Path configFile = FabricLoader.getInstance().getConfigDir()
                 .resolve(BetterSearch.MOD_ID + ".json");
-        SearchSettings settings = ConfigIo.loadOrCreate(configFile);
+        SearchSettings settings = ConfigIo.loadOrCreate(configFile, loadedModCount());
         BetterSearchClient.setConfigFile(configFile);
         BetterSearchClient.setSettings(settings);
 
@@ -28,5 +28,12 @@ public final class BetterSearchFabric implements ClientModInitializer {
                 client -> com.rivalzin.bettersearch.client.Ae2Search.tick());
 
         BetterSearch.LOGGER.info("[{}] loaded, config: {}", BetterSearch.MOD_NAME, configFile);
+    }
+
+    private static int loadedModCount() {
+        return (int) FabricLoader.getInstance().getAllMods().stream()
+                .filter(mod -> !"builtin".equals(mod.getMetadata().getType())
+                        && !"fabricloader".equals(mod.getMetadata().getId()))
+                .count();
     }
 }

@@ -10,6 +10,7 @@ import net.minecraftforge.client.ConfigGuiHandler;
 import net.minecraftforge.client.event.RegisterClientReloadListenersEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.loading.FMLPaths;
@@ -22,7 +23,7 @@ final class ForgeClientBootstrap {
 
     static void init() {
         Path configFile = FMLPaths.CONFIGDIR.get().resolve(BetterSearch.MOD_ID + ".json");
-        SearchSettings settings = ConfigIo.loadOrCreate(configFile);
+        SearchSettings settings = ConfigIo.loadOrCreate(configFile, loadedModCount());
         BetterSearchClient.setConfigFile(configFile);
         BetterSearchClient.setSettings(settings);
 
@@ -42,5 +43,14 @@ final class ForgeClientBootstrap {
 
     private static void onRegisterClientReloadListeners(RegisterClientReloadListenersEvent event) {
         event.registerReloadListener(new LanguageReloadListener());
+    }
+
+    private static int loadedModCount() {
+        return (int) ModList.get().getMods().stream()
+                .filter(mod -> !"minecraft".equals(mod.getModId())
+                        && !"forge".equals(mod.getModId())
+                        && !"neoforge".equals(mod.getModId())
+                        && !"mcp".equals(mod.getModId()))
+                .count();
     }
 }
