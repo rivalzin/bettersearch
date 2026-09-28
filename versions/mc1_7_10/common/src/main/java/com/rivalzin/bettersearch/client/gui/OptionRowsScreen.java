@@ -1,5 +1,7 @@
 package com.rivalzin.bettersearch.client.gui;
 
+import com.rivalzin.bettersearch.client.IntegrationAvailability;
+
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
@@ -45,6 +47,8 @@ public abstract class OptionRowsScreen extends GuiScreen {
         ResourceLocation preview;
         ResourceLocation[] icons = new ResourceLocation[0];
         String categoryKey;
+        String requiredTip;
+        ResourceLocation disabledIcon;
         int y;
 
         Row(String title, String description, GuiButton control,
@@ -54,6 +58,18 @@ public abstract class OptionRowsScreen extends GuiScreen {
             this.control = control;
             this.reset = reset;
             this.modified = modified;
+        }
+
+        public Row requiresMod(String id) {
+            control.enabled = IntegrationAvailability.available(id);
+            if (reset != null) {
+                reset.enabled = control.enabled && modified.getAsBoolean();
+            }
+            if (!control.enabled) {
+                requiredTip = ComponentCompat.translatable(KEY_PREFIX + "integration_required", title);
+                disabledIcon = modIcon(id + "_disabled");
+            }
+            return this;
         }
 
         public Row icons(ResourceLocation... textures) {
@@ -298,6 +314,9 @@ public abstract class OptionRowsScreen extends GuiScreen {
         GuiButton reset = null;
         if (onReset != null) {
             reset = ButtonCompat.builder(ComponentCompat.literal("↺"), b -> {
+                if (!control.enabled) {
+                    return;
+                }
                 onReset.run();
                 rebuildWidgets();
             }).bounds(listX + barWidth + 4, 0, RESET_SIZE, RESET_SIZE)
@@ -552,7 +571,7 @@ public abstract class OptionRowsScreen extends GuiScreen {
         updateHoveredRow(mouseX, mouseY);
         for (Row row : rows) {
             if (row.reset != null && row.modified != null) {
-                row.reset.enabled = row.modified.getAsBoolean();
+                row.reset.enabled = row.control.enabled && row.modified.getAsBoolean();
             }
         }
         updateFooterState();
@@ -571,6 +590,11 @@ public abstract class OptionRowsScreen extends GuiScreen {
     }
 
     private void renderTip(int mouseX, int mouseY) {
+        if (hoveredRow != null && hoveredRow.requiredTip != null) {
+            this.func_146283_a(this.fontRendererObj.listFormattedStringToWidth(
+                    hoveredRow.requiredTip, Math.max(this.width / 2, 170)), mouseX, mouseY);
+            return;
+        }
         for (Object raw : this.buttonList) {
             GuiButton widget = (GuiButton) raw;
             if (!widget.visible) {
@@ -627,7 +651,7 @@ public abstract class OptionRowsScreen extends GuiScreen {
             int bottom = top + ROW_HEIGHT - 2;
             boolean hovered = row == hoveredRow;
             Gui.drawRect(listX, top, listX + barWidth, bottom, hovered ? Theme.ROW_BG_HOVER : Theme.ROW_BG);
-            if (hovered) {
+            if (hovered && row.control.enabled) {
                 Gui.drawRect(listX, top, listX + 2, bottom, Theme.ACCENT);
             }
 
@@ -635,12 +659,12 @@ public abstract class OptionRowsScreen extends GuiScreen {
             int labelRight = row.control.xPosition - 6;
             int iconCount = Math.min(row.icons.length, Math.max(0, (labelRight - labelX - 20) / 20));
             for (int i = 0; i < iconCount; i++) {
-                renderIcon(row.icons[i], labelX, top + 3);
+                renderIcon(row.disabledIcon != null ? row.disabledIcon : row.icons[i], labelX, top + 3);
                 labelX += 20;
             }
             int labelLimit = Math.max(0, labelRight - labelX);
             this.fontRendererObj.drawStringWithShadow(ellipsize(row.title, labelLimit),
-                    labelX, top + (ROW_HEIGHT - 2 - 8) / 2, hovered ? Theme.TITLE : Theme.TEXT);
+                    labelX, top + (ROW_HEIGHT - 2 - 8) / 2, !row.control.enabled ? Theme.TEXT_DIM : hovered ? Theme.TITLE : Theme.TEXT);
         }
     }
 

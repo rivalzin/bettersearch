@@ -5,6 +5,7 @@ import com.rivalzin.bettersearch.client.SearchTreeWrapper;
 import com.rivalzin.bettersearch.client.CreativeSearch;
 import com.rivalzin.bettersearch.client.RecipeBookSearch;
 import com.rivalzin.bettersearch.client.ModConfig;
+import com.rivalzin.bettersearch.client.IntegrationAvailability;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.gui.inventory.GuiContainerCreative;
@@ -15,7 +16,6 @@ import net.minecraft.client.util.SearchTree;
 import net.minecraft.client.util.SearchTreeManager;
 import net.minecraft.client.gui.recipebook.RecipeList;
 import net.minecraft.item.ItemStack;
-import net.minecraftforge.fml.common.Loader;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.relauncher.ReflectionHelper;
@@ -24,9 +24,12 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 public final class SearchHook {
-    private final boolean hasJei = Loader.isModLoaded("jei") || Loader.isModLoaded("hei");
+    private final boolean hasJei = IntegrationAvailability.available("jei") || IntegrationAvailability.available("hei");
+    private final boolean hasNei = IntegrationAvailability.available("nei");
     private Method installJei;
+    private Method installNei;
     private final IntegrationRetry jeiRetry = new IntegrationRetry();
+    private final IntegrationRetry neiRetry = new IntegrationRetry();
     private Method refreshCreative;
     private Field creativeSearchField;
     private Field creativeScrollField;
@@ -39,6 +42,7 @@ public final class SearchHook {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
+        installNeiHook();
 
         if (Minecraft.getMinecraft().player != null) {
             CreativeSearch.warmUp();
@@ -136,6 +140,25 @@ public final class SearchHook {
                 BetterSearch.LOGGER.warn("[{}] JEI/HEI integration {}: {}",
                         BetterSearch.MOD_NAME, jeiRetry.disabled() ? "unavailable" : "deferred",
                         IntegrationRetry.cause(t).toString());
+            }
+        }
+    }
+
+    private void installNeiHook() {
+        if (!hasNei || !neiRetry.ready(System.nanoTime())) {
+            return;
+        }
+        try {
+            if (installNei == null) {
+                installNei = Class.forName("com.rivalzin.bettersearch.forge.nei.NeiIntegration")
+                        .getMethod("install");
+            }
+            installNei.invoke(null);
+            neiRetry.succeeded();
+        } catch (Exception | LinkageError error) {
+            if (neiRetry.failed(error, System.nanoTime())) {
+                BetterSearch.LOGGER.warn("[{}] NEI integration {}: {}", BetterSearch.MOD_NAME,
+                        neiRetry.disabled() ? "unavailable" : "deferred", IntegrationRetry.cause(error).toString());
             }
         }
     }

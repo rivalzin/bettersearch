@@ -1,6 +1,7 @@
 package com.rivalzin.bettersearch.forge.ae2;
 
-import java.util.Map;
+import java.io.IOException;
+import java.io.InputStream;
 import net.minecraft.launchwrapper.IClassTransformer;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
@@ -17,6 +18,21 @@ public final class Ae2Transformer implements IClassTransformer {
     private static final String ITEM = "appeng.client.me.ItemRepo";
     private static final String FLUID = "appeng.client.me.FluidRepo";
     private static final String TERMINAL = "appeng.client.gui.implementations.GuiInterfaceTerminal";
+
+    public static boolean supportsRepository() {
+        String resource = ITEM.replace('.', '/') + ".class";
+        try (InputStream input = Ae2Transformer.class.getClassLoader().getResourceAsStream(resource)) {
+            if (input == null) {
+                return false;
+            }
+            ClassNode node = new ClassNode();
+            new ClassReader(input).accept(node, 0);
+            return repository(node);
+        } catch (IOException | RuntimeException | LinkageError error) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(error);
+            return false;
+        }
+    }
 
     @Override
     public byte[] transform(String name, String transformedName, byte[] original) {

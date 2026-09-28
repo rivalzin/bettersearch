@@ -45,7 +45,7 @@ public final class CreativeIndex {
         });
     }
 
-    static void fill(EntrySnapshot<?> builder, ItemStack stack, SearchSettings settings,
+    public static void fill(EntrySnapshot<?> builder, ItemStack stack, SearchSettings settings,
                      List<String> codes, String displayName, List<String> tooltip) {
         ResourceLocation id = Item.REGISTRY.getNameForObject(stack.getItem());
         if (id != null) {

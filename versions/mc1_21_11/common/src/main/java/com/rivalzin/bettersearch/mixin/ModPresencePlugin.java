@@ -24,26 +24,28 @@ public abstract class ModPresencePlugin implements IMixinConfigPlugin {
 
     private boolean detect() {
         Boolean early = viaLoadingModList("net.neoforged.fml.loading.LoadingModList");
-        if (early != null) {
+        if (Boolean.TRUE.equals(early)) {
             return early;
         }
         early = viaLoadingModList("net.minecraftforge.fml.loading.LoadingModList");
-        if (early != null) {
+        if (Boolean.TRUE.equals(early)) {
             return early;
         }
         Boolean list = viaModList("net.neoforged.fml.ModList");
-        if (list != null) {
+        if (Boolean.TRUE.equals(list)) {
             return list;
         }
         list = viaModList("net.minecraftforge.fml.ModList");
-        if (list != null) {
+        if (Boolean.TRUE.equals(list)) {
             return list;
         }
         try {
             Class<?> loader = Class.forName("net.fabricmc.loader.api.FabricLoader");
             Object instance = loader.getMethod("getInstance").invoke(null);
             Object loaded = loader.getMethod("isModLoaded", String.class).invoke(instance, modId);
-            return Boolean.TRUE.equals(loaded);
+            if (Boolean.TRUE.equals(loaded)) {
+                return true;
+            }
         } catch (Exception | LinkageError ignored) {
             com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(ignored);
         }

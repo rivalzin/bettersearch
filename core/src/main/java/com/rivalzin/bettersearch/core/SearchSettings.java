@@ -29,6 +29,10 @@ public final class SearchSettings {
 
     public boolean searchJei = true;
 
+    public boolean searchHei = true;
+
+    public boolean searchNei = true;
+
     public boolean searchEmi = true;
 
     public boolean searchRei = true;
@@ -36,6 +40,8 @@ public final class SearchSettings {
     public boolean searchTomsStorage = true;
 
     public boolean searchAe2 = true;
+
+    public boolean searchRefinedStorage = true;
 
     public int typoTolerance = 2;
 
@@ -84,10 +90,13 @@ public final class SearchSettings {
         fixVersionNames = source.fixVersionNames;
         commandSuggestionLimit = source.commandSuggestionLimit;
         searchJei = source.searchJei;
+        searchHei = source.searchHei;
+        searchNei = source.searchNei;
         searchEmi = source.searchEmi;
         searchRei = source.searchRei;
         searchTomsStorage = source.searchTomsStorage;
         searchAe2 = source.searchAe2;
+        searchRefinedStorage = source.searchRefinedStorage;
         typoTolerance = source.typoTolerance;
         minTypoLength = source.minTypoLength;
         matchInitials = source.matchInitials;
@@ -171,10 +180,13 @@ public final class SearchSettings {
                 && fixVersionNames == s.fixVersionNames
                 && commandSuggestionLimit == s.commandSuggestionLimit
                 && searchJei == s.searchJei
+                && searchHei == s.searchHei
+                && searchNei == s.searchNei
                 && searchEmi == s.searchEmi
                 && searchRei == s.searchRei
                 && searchTomsStorage == s.searchTomsStorage
                 && searchAe2 == s.searchAe2
+                && searchRefinedStorage == s.searchRefinedStorage
                 && typoTolerance == s.typoTolerance
                 && minTypoLength == s.minTypoLength
                 && matchInitials == s.matchInitials
@@ -197,7 +209,8 @@ public final class SearchSettings {
         return java.util.Objects.hash(enabled, searchCreative, searchRecipeBook,
                 searchPlayerNames, searchCommandItems, fixCommandErrors, fixVersionNames,
                 commandSuggestionLimit,
-                searchJei, searchEmi, searchRei, searchTomsStorage, searchAe2,
+                searchJei, searchHei, searchNei, searchEmi, searchRei, searchTomsStorage, searchAe2,
+                searchRefinedStorage,
                 typoTolerance, minTypoLength, matchInitials, ignoreSpaces,
                 crossLanguage, foreignStrictOnly, sortByRelevance, searchTooltips, searchItemIds,
                 searchModIds, fuzzyThreshold, crossFieldMatching, crossFieldThreshold, maxResults,

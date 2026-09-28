@@ -81,7 +81,7 @@ jar {
     manifest {
         attributes([
 
-                'MixinConfigs'           : 'bettersearch-forge.mixins.json,bettersearch-jei.mixins.json,bettersearch-rei.mixins.json,bettersearch-toms-forge.mixins.json,bettersearch-ae2-forge.mixins.json',
+                'MixinConfigs'           : 'bettersearch-forge.mixins.json,bettersearch-jei.mixins.json,bettersearch-rei.mixins.json,bettersearch-toms-forge.mixins.json,bettersearch-ae2-forge.mixins.json,bettersearch-refinedstorage.mixins.json',
                 'Specification-Title'    : mod_name,
                 'Specification-Vendor'   : mod_authors,
                 'Specification-Version'  : project.version,

@@ -34,7 +34,7 @@ public final class CreativeSearch {
 
     public static void warmUp() {
         SearchSettings settings = ModConfig.settings();
-        if (settings.enabled && (settings.searchCreative || settings.searchJei)) {
+        if (settings.enabled && settings.searchCreative) {
             ensureIndex();
         }
     }

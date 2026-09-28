@@ -3,6 +3,7 @@ package com.rivalzin.bettersearch.forge.jei;
 import com.rivalzin.bettersearch.BetterSearch;
 import com.rivalzin.bettersearch.FailurePolicy;
 import com.rivalzin.bettersearch.forge.IntegrationRetry;
+import com.rivalzin.bettersearch.forge.nei.NeiIntegration;
 import com.rivalzin.bettersearch.async.AsyncIndexState;
 import com.rivalzin.bettersearch.async.EntrySnapshot;
 import com.rivalzin.bettersearch.client.ModConfig;
@@ -29,6 +30,7 @@ public final class JeiSearchBridge {
             this::reportFailure);
     private static volatile int generation;
     private final Elements source;
+    private final String viewer;
     private final IntegrationRetry retry = new IntegrationRetry();
     private Context context;
     private volatile Cache cache;
@@ -38,7 +40,12 @@ public final class JeiSearchBridge {
     }
 
     JeiSearchBridge(Elements source) {
+        this(source, "jei");
+    }
+
+    JeiSearchBridge(Elements source, String viewer) {
         this.source = source;
+        this.viewer = viewer;
     }
 
     synchronized void invalidate() {
@@ -60,7 +67,7 @@ public final class JeiSearchBridge {
 
     synchronized int[] search(String word) {
         SearchSettings settings = ModConfig.settings();
-        if (word == null || word.isEmpty() || !settings.enabled || !settings.searchJei
+        if (word == null || word.isEmpty() || !settings.enabled || !enabledViewer(viewer, settings)
                 || !retry.ready(System.nanoTime())) {
             return null;
         }
@@ -89,6 +96,13 @@ public final class JeiSearchBridge {
             reportFailure(error);
             return null;
         }
+    }
+
+    static boolean enabledViewer(String viewer, SearchSettings settings) {
+        if (NeiIntegration.usesJeiSearch()) {
+            return settings.searchNei;
+        }
+        return "hei".equals(viewer) ? settings.searchHei : settings.searchJei;
     }
 
     synchronized List<Object> searchElements(String word) {

@@ -1,5 +1,7 @@
 package com.rivalzin.bettersearch.client.gui;
 
+import com.rivalzin.bettersearch.client.IntegrationAvailability;
+
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -53,6 +55,8 @@ public abstract class OptionRowsScreen extends Screen {
         ResourceLocation preview;
         ResourceLocation[] icons = new ResourceLocation[0];
         String categoryKey;
+        Component requiredTip;
+        ResourceLocation disabledIcon;
         int y;
 
         Row(Component title, Component description, AbstractWidget control,
@@ -62,6 +66,23 @@ public abstract class OptionRowsScreen extends Screen {
             this.control = control;
             this.reset = reset;
             this.modified = modified;
+        }
+
+        public Row requiresMod(String id) {
+            control.active = IntegrationAvailability.available(id);
+            if (reset != null) {
+                reset.active = control.active && modified.getAsBoolean();
+            }
+            if (!control.active) {
+                requiredTip = Component.translatable(KEY_PREFIX + "integration_required", title);
+                disabledIcon = modIcon(id + "_disabled");
+                control.setTooltip(null);
+                control.setMessage(Component.empty().append(title).append(": ").append(requiredTip));
+                if (reset != null) {
+                    reset.setTooltip(null);
+                }
+            }
+            return this;
         }
 
         public Row icons(ResourceLocation... textures) {
@@ -284,6 +305,9 @@ public abstract class OptionRowsScreen extends Screen {
         Button reset = null;
         if (onReset != null) {
             reset = Button.builder(Component.literal("↺"), b -> {
+                if (!control.active) {
+                    return;
+                }
                 onReset.run();
                 deferRebuild();
             }).bounds(listX + barWidth + 4, 0, RESET_SIZE, RESET_SIZE)
@@ -466,7 +490,7 @@ public abstract class OptionRowsScreen extends Screen {
         updateHoveredRow(mouseX, mouseY);
         for (Row row : rows) {
             if (row.reset != null && row.modified != null) {
-                row.reset.active = row.modified.getAsBoolean();
+                row.reset.active = row.control.active && row.modified.getAsBoolean();
             }
         }
         updateFooterState();
@@ -474,6 +498,9 @@ public abstract class OptionRowsScreen extends Screen {
         renderBackground(guiGraphics);
         super.render(guiGraphics, mouseX, mouseY, partialTick);
         renderScrollbar(guiGraphics, mouseX, mouseY);
+        if (hoveredRow != null && hoveredRow.requiredTip != null) {
+            guiGraphics.renderTooltip(this.font, hoveredRow.requiredTip, mouseX, mouseY);
+        }
     }
 
     protected void updateFooterState() {
@@ -520,19 +547,19 @@ public abstract class OptionRowsScreen extends Screen {
             int bottom = top + ROW_HEIGHT - 2;
             boolean hovered = row == hoveredRow;
             guiGraphics.fill(listX, top, listX + barWidth, bottom, hovered ? Theme.ROW_BG_HOVER : Theme.ROW_BG);
-            if (hovered) {
+            if (hovered && row.control.active) {
                 guiGraphics.fill(listX, top, listX + 2, bottom, Theme.ACCENT);
             }
             int labelX = listX + 8;
             int labelRight = row.control.getX() - 6;
             int iconCount = Math.min(row.icons.length, Math.max(0, (labelRight - labelX - 20) / 20));
             for (int i = 0; i < iconCount; i++) {
-                renderIcon(guiGraphics, row.icons[i], labelX, top + 3);
+                renderIcon(guiGraphics, row.disabledIcon != null ? row.disabledIcon : row.icons[i], labelX, top + 3);
                 labelX += 20;
             }
             int labelLimit = Math.max(0, labelRight - labelX);
             guiGraphics.drawString(this.font, ellipsize(row.title, labelLimit),
-                    labelX, top + (ROW_HEIGHT - 2 - 8) / 2, hovered ? Theme.TITLE : Theme.TEXT);
+                    labelX, top + (ROW_HEIGHT - 2 - 8) / 2, !row.control.active ? Theme.TEXT_DIM : hovered ? Theme.TITLE : Theme.TEXT);
         }
     }
 

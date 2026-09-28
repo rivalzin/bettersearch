@@ -19,6 +19,7 @@ public final class JeiIntegration {
     private static int appliedGeneration = -1;
     private static int appliedLanguageStamp = -1;
     private static String appliedLanguage = "";
+    private static boolean appliedEnabled;
 
     private JeiIntegration() {
     }
@@ -54,13 +55,16 @@ public final class JeiIntegration {
         int generation = JeiSearchBridge.generation();
         int languageStamp = LangTable.stamp();
         String language = Minecraft.getMinecraft().gameSettings.language;
+        boolean enabled = JeiSearchBridge.enabledViewer(legacy ? "jei" : "hei", ModConfig.settings());
         if (changed || filter != appliedFilter || stamp != appliedStamp || generation != appliedGeneration
-                || languageStamp != appliedLanguageStamp || !language.equals(appliedLanguage)) {
+                || languageStamp != appliedLanguageStamp || !language.equals(appliedLanguage)
+                || enabled != appliedEnabled) {
             appliedFilter = filter;
             appliedStamp = stamp;
             appliedGeneration = generation;
             appliedLanguageStamp = languageStamp;
             appliedLanguage = language;
+            appliedEnabled = enabled;
             filter.invalidateCache();
         }
     }

@@ -46,10 +46,10 @@ public final class ConfigIo {
             "  permissive passes. Higher = tries harder, slightly more time per keystroke.",
             "sortByRelevance: order by best match instead of creative tab order.",
             "maxResults: 0 = unlimited.",
-            "searchJei / searchEmi / searchRei: use this same search inside JEI's, EMI's and",
-            "  REI's item lists. There is no separate tuning for them on purpose: every option",
+            "searchJei / searchHei / searchNei / searchEmi / searchRei: use the same search",
+            "  inside supported recipe browsers. Every search option",
             "  above applies there too, because it is the same index and the same matcher.",
-            "searchTomsStorage / searchAe2: enhance supported storage terminals with the same search settings."
+            "searchTomsStorage / searchAe2 / searchRefinedStorage: enhance supported storage terminals with the same search settings."
     };
 
     private ConfigIo() {
@@ -83,7 +83,7 @@ public final class ConfigIo {
     private static SearchSettings fromJsonTolerant(JsonObject source) {
         SearchSettings whole = fromJsonQuiet(source);
         if (whole != null) {
-            return whole;
+            return migrateIntegrations(source, whole);
         }
         java.util.List<Map.Entry<String, JsonElement>> good =
                 new java.util.ArrayList<Map.Entry<String, JsonElement>>();
@@ -103,7 +103,17 @@ public final class ConfigIo {
                 best = read;
             }
         }
-        return best;
+        return migrateIntegrations(source, best);
+    }
+
+    private static SearchSettings migrateIntegrations(JsonObject source, SearchSettings settings) {
+        if (!source.has("searchHei")) {
+            settings.searchHei = settings.searchJei;
+        }
+        if (!source.has("searchNei")) {
+            settings.searchNei = settings.searchJei;
+        }
+        return settings;
     }
 
     private static SearchSettings fromJsonQuiet(JsonObject source) {

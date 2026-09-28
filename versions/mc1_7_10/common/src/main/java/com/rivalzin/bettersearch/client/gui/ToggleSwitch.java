@@ -31,7 +31,7 @@ public final class ToggleSwitch extends GuiButton implements Pressable {
     }
 
     private void set(boolean newValue) {
-        if (newValue != value) {
+        if (this.enabled && this.visible && newValue != value) {
             animationFrom = animation();
             animationStart = Minecraft.getSystemTime();
             value = newValue;
@@ -58,7 +58,7 @@ public final class ToggleSwitch extends GuiButton implements Pressable {
         boolean about = mouseX >= this.xPosition && mouseY >= this.yPosition
                 && mouseX < this.xPosition + this.width && mouseY < this.yPosition + this.height;
 
-        float position = animation();
+        float position = this.enabled ? animation() : 0.0F;
         int x = this.xPosition;
         int y = this.yPosition;
         int right = x + this.width;

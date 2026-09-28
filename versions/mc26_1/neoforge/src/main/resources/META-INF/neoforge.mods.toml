@@ -46,3 +46,6 @@ type = "required"
 versionRange = "[26.1,26.2)"
 ordering = "NONE"
 side = "CLIENT"
+
+[[mixins]]
+config = "bettersearch-refinedstorage.mixins.json"

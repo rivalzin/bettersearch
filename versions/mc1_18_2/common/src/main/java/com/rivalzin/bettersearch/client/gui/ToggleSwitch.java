@@ -48,7 +48,7 @@ public final class ToggleSwitch extends AbstractWidget {
     }
 
     private void set(boolean newValue) {
-        if (newValue != value) {
+        if (this.active && this.visible && newValue != value) {
             animationFrom = animation();
             animationStart = Util.getMillis();
             value = newValue;
@@ -69,7 +69,7 @@ public final class ToggleSwitch extends AbstractWidget {
 
     @Override
     public void renderButton(PoseStack poseStack, int mouseX, int mouseY, float partialTick) {
-        float position = animation();
+        float position = this.active ? animation() : 0.0F;
         int x = this.x;
         int y = this.y;
         int right = x + getWidth();
@@ -91,6 +91,6 @@ public final class ToggleSwitch extends AbstractWidget {
     @Override
     public void updateNarration(NarrationElementOutput output) {
         output.add(NarratedElementType.TITLE, ComponentCompat.translatable("gui.narrate.button",
-                ComponentCompat.empty().append(getMessage()).append(": ").append(CommonComponents.optionStatus(value))));
+                ComponentCompat.empty().append(getMessage()).append(": ").append(CommonComponents.optionStatus(this.active && value))));
     }
 }

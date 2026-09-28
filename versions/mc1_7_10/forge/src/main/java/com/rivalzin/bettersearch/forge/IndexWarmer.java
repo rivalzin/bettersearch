@@ -6,7 +6,7 @@ import cpw.mods.fml.common.gameevent.TickEvent;
 import net.minecraft.client.Minecraft;
 
 public final class IndexWarmer {
-    private final boolean hasNei = cpw.mods.fml.common.Loader.isModLoaded("NotEnoughItems");
+    private final boolean hasNei = com.rivalzin.bettersearch.client.IntegrationAvailability.available("nei");
     private java.lang.reflect.Method installNei;
     private boolean neiFailed;
 

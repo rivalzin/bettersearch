@@ -32,7 +32,8 @@ public final class CreativeSearch {
 
     public static void warmUp() {
         SearchSettings settings = ModConfig.settings();
-        if (settings.enabled && (settings.searchCreative || settings.searchJei)) {
+        if (settings.enabled && (settings.searchCreative || settings.searchNei
+                && IntegrationAvailability.available("nei"))) {
             ensureIndex();
         }
     }
@@ -72,7 +73,7 @@ public final class CreativeSearch {
 
     public static List<ItemStack> searchForViewer(String query) {
         SearchSettings settings = ModConfig.settings();
-        if (query == null || !settings.enabled || !settings.searchJei) {
+        if (query == null || !settings.enabled || !settings.searchNei) {
             return null;
         }
         ensureIndex();

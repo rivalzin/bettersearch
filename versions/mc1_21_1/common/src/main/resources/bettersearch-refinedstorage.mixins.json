@@ -1,0 +1,17 @@
+{
+  "required": false,
+  "minVersion": "0.8.4",
+  "package": "com.rivalzin.bettersearch.mixin.refinedstorage",
+  "plugin": "com.rivalzin.bettersearch.mixin.refinedstorage.RsMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "RsRepositoryMixin",
+    "RsQueryMixin",
+    "RsMenuMixin",
+    "RsScreenMixin",
+    "RsLifecycleMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

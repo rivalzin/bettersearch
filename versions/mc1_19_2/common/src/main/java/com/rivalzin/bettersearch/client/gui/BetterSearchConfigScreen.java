@@ -2,6 +2,7 @@ package com.rivalzin.bettersearch.client.gui;
 
 import com.rivalzin.bettersearch.client.BetterSearchClient;
 import com.rivalzin.bettersearch.client.LanguageCatalog;
+import com.rivalzin.bettersearch.client.IntegrationAvailability;
 import com.rivalzin.bettersearch.core.SearchSettings;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.ConfirmLinkScreen;
@@ -31,6 +32,7 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
 
     private final SearchSettings settings;
     private final SearchSettings opened;
+    private final SearchSettings availableDefaults;
     private Tab tab = Tab.GENERAL;
     private boolean searchIntegrationsExpanded;
     private boolean otherIntegrationsExpanded;
@@ -42,6 +44,36 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
         super(Component.translatable("bettersearch.config.title"), parent);
         this.settings = BetterSearchClient.settings().copy();
         this.opened = this.settings.copy();
+        this.availableDefaults = defaultsForInstalledMods(this.settings);
+    }
+
+    private static SearchSettings defaultsForInstalledMods(SearchSettings settings) {
+        SearchSettings defaults = DEFAULTS.copy();
+        if (!IntegrationAvailability.available("jei")) {
+            defaults.searchJei = settings.searchJei;
+        }
+        if (!IntegrationAvailability.available("hei")) {
+            defaults.searchHei = settings.searchHei;
+        }
+        if (!IntegrationAvailability.available("nei")) {
+            defaults.searchNei = settings.searchNei;
+        }
+        if (!IntegrationAvailability.available("emi")) {
+            defaults.searchEmi = settings.searchEmi;
+        }
+        if (!IntegrationAvailability.available("rei")) {
+            defaults.searchRei = settings.searchRei;
+        }
+        if (!IntegrationAvailability.available("ae2")) {
+            defaults.searchAe2 = settings.searchAe2;
+        }
+        if (!IntegrationAvailability.available("toms_storage")) {
+            defaults.searchTomsStorage = settings.searchTomsStorage;
+        }
+        if (!IntegrationAvailability.available("refined_storage")) {
+            defaults.searchRefinedStorage = settings.searchRefinedStorage;
+        }
+        return defaults;
     }
 
     @Override
@@ -169,14 +201,25 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
                         value -> searchIntegrationsExpanded = value)) {
                     addToggle("search_jei", () -> settings.searchJei,
                             v -> settings.searchJei = v, DEFAULTS.searchJei)
+                            .requiresMod("jei")
                             .preview(previewOf("search_jei"))
                             .icons(modIcon("jei"));
+                    addToggle("search_hei", () -> settings.searchHei,
+                            v -> settings.searchHei = v, DEFAULTS.searchHei)
+                            .requiresMod("hei")
+                            .icons(modIcon("hei"));
+                    addToggle("search_nei", () -> settings.searchNei,
+                            v -> settings.searchNei = v, DEFAULTS.searchNei)
+                            .requiresMod("nei")
+                            .icons(modIcon("nei"));
                     addToggle("search_emi", () -> settings.searchEmi,
                             v -> settings.searchEmi = v, DEFAULTS.searchEmi)
+                            .requiresMod("emi")
                             .preview(previewOf("search_emi"))
                             .icons(modIcon("emi"));
                     addToggle("search_rei", () -> settings.searchRei,
                             v -> settings.searchRei = v, DEFAULTS.searchRei)
+                            .requiresMod("rei")
                             .preview(previewOf("search_rei"))
                             .icons(modIcon("rei"));
                 }
@@ -184,10 +227,16 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
                         value -> otherIntegrationsExpanded = value)) {
                     addToggle("search_ae2", () -> settings.searchAe2,
                             v -> settings.searchAe2 = v, DEFAULTS.searchAe2)
+                            .requiresMod("ae2")
                             .icons(modIcon("ae2"));
                     addToggle("search_toms_storage", () -> settings.searchTomsStorage,
                             v -> settings.searchTomsStorage = v, DEFAULTS.searchTomsStorage)
+                            .requiresMod("toms_storage")
                             .icons(modIcon("toms_storage"));
+                    addToggle("search_refined_storage", () -> settings.searchRefinedStorage,
+                            v -> settings.searchRefinedStorage = v, DEFAULTS.searchRefinedStorage)
+                            .requiresMod("refined_storage")
+                            .icons(modIcon("refined_storage"));
                 }
             }
         }
@@ -210,7 +259,7 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
         int half = (width - 2) / 2;
         defaultsButton = addFixed(ButtonCompat.builder(Component.translatable("bettersearch.config.restore_defaults"),
                         b -> {
-                            copyInto(DEFAULTS, settings);
+                            copyInto(availableDefaults, settings);
                             deferRebuild();
                         })
                 .bounds(x, y, half, BUTTON_HEIGHT).build());
@@ -244,7 +293,7 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
     @Override
     protected void updateFooterState() {
         if (defaultsButton != null) {
-            defaultsButton.active = !settings.equals(DEFAULTS);
+            defaultsButton.active = !settings.equals(availableDefaults);
         }
         if (undoButton != null) {
             undoButton.active = !settings.equals(opened);

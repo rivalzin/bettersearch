@@ -1,5 +1,7 @@
 package com.rivalzin.bettersearch.client.gui;
 
+import com.rivalzin.bettersearch.client.IntegrationAvailability;
+
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
@@ -55,6 +57,8 @@ public abstract class OptionRowsScreen extends Screen {
         Identifier preview;
         Identifier[] icons = new Identifier[0];
         String categoryKey;
+        Component requiredTip;
+        Identifier disabledIcon;
         int y;
 
         Row(Component title, Component description, AbstractWidget control,
@@ -68,6 +72,23 @@ public abstract class OptionRowsScreen extends Screen {
 
         public Row preview(Identifier texture) {
             this.preview = texture;
+            return this;
+        }
+
+        public Row requiresMod(String id) {
+            control.active = IntegrationAvailability.available(id);
+            if (reset != null) {
+                reset.active = control.active && modified.getAsBoolean();
+            }
+            if (!control.active) {
+                requiredTip = Component.translatable(KEY_PREFIX + "integration_required", title);
+                disabledIcon = modIcon(id + "_disabled");
+                control.setTooltip(null);
+                control.setMessage(Component.empty().append(title).append(": ").append(requiredTip));
+                if (reset != null) {
+                    reset.setTooltip(null);
+                }
+            }
             return this;
         }
 
@@ -278,6 +299,9 @@ public abstract class OptionRowsScreen extends Screen {
         Button reset = null;
         if (onReset != null) {
             reset = Button.builder(Component.literal("↺"), b -> {
+                if (!control.active) {
+                    return;
+                }
                 onReset.run();
                 deferRebuild();
             }).bounds(listX + barWidth + 4, 0, RESET_SIZE, RESET_SIZE)
@@ -463,13 +487,16 @@ public abstract class OptionRowsScreen extends Screen {
         updateHoveredRow(mouseX, mouseY);
         for (Row row : rows) {
             if (row.reset != null && row.modified != null) {
-                row.reset.active = row.modified.getAsBoolean();
+                row.reset.active = row.control.active && row.modified.getAsBoolean();
             }
         }
         updateFooterState();
 
         super.extractRenderState(guiGraphics, mouseX, mouseY, partialTick);
         renderScrollbar(guiGraphics, mouseX, mouseY);
+        if (hoveredRow != null && hoveredRow.requiredTip != null) {
+            guiGraphics.setTooltipForNextFrame(this.font, hoveredRow.requiredTip, mouseX, mouseY);
+        }
     }
 
     protected void updateFooterState() {
@@ -521,18 +548,18 @@ public abstract class OptionRowsScreen extends Screen {
             boolean hovered = row == hoveredRow || row.control.isFocused()
                     || row.reset != null && row.reset.isFocused();
             guiGraphics.fill(listX, top, listX + barWidth, bottom, hovered ? Theme.ROW_BG_HOVER : Theme.ROW_BG);
-            if (hovered) {
+            if (hovered && row.control.active) {
                 guiGraphics.fill(listX, top, listX + 2, bottom, Theme.ACCENT);
             }
             int textX = listX + 8;
             int labelRight = row.control.getX() - 6;
             int iconCount = Math.min(row.icons.length, Math.max(0, (labelRight - textX) / 20));
             for (int i = 0; i < iconCount; i++) {
-                renderIcon(guiGraphics, row.icons[i], textX, top + 3);
+                renderIcon(guiGraphics, row.disabledIcon != null ? row.disabledIcon : row.icons[i], textX, top + 3);
                 textX += 20;
             }
             guiGraphics.text(this.font, ellipsize(row.title, labelRight - textX),
-                    textX, top + (ROW_HEIGHT - 2 - 8) / 2, hovered ? Theme.TITLE : Theme.TEXT);
+                    textX, top + (ROW_HEIGHT - 2 - 8) / 2, !row.control.active ? Theme.TEXT_DIM : hovered ? Theme.TITLE : Theme.TEXT);
         }
     }
 

@@ -4,10 +4,10 @@ import java.util.Map;
 import net.minecraftforge.fml.relauncher.IFMLLoadingPlugin;
 
 @IFMLLoadingPlugin.SortingIndex(1001)
-@IFMLLoadingPlugin.TransformerExclusions({"com.rivalzin.bettersearch.forge.ae2"})
+@IFMLLoadingPlugin.TransformerExclusions({"com.rivalzin.bettersearch.forge.ae2", "com.rivalzin.bettersearch.forge.refinedstorage"})
 public final class Ae2LoadingPlugin implements IFMLLoadingPlugin {
     @Override
-    public String[] getASMTransformerClass() { return new String[]{Ae2Transformer.class.getName()}; }
+    public String[] getASMTransformerClass() { return new String[]{Ae2Transformer.class.getName(), "com.rivalzin.bettersearch.forge.refinedstorage.RefinedStorageTransformer"}; }
     @Override
     public String getModContainerClass() { return null; }
     @Override

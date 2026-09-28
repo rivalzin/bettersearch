@@ -36,7 +36,7 @@ final class HeiSearchHook implements InvocationHandler {
             tokenPrefix = null;
             noPrefix = null;
         }
-        bridge = new JeiSearchBridge(this::elements);
+        bridge = new JeiSearchBridge(this::elements, "hei");
     }
 
     static boolean install(Object filter, Field elementSearchField) throws Exception {
