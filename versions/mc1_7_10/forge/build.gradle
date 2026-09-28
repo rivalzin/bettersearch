@@ -54,3 +54,10 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 
 }
+
+jar {
+    manifest {
+        attributes 'FMLCorePlugin': 'com.rivalzin.bettersearch.forge.ae2.Ae2LoadingPlugin',
+                'FMLCorePluginContainsFMLMod': 'true'
+    }
+}

@@ -1,0 +1,17 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "com.rivalzin.bettersearch.mixin.ae2",
+  "compatibilityLevel": "JAVA_8",
+  "plugin": "com.rivalzin.bettersearch.mixin.ae2.Ae2MixinPlugin",
+  "client": [
+    "Ae2RepositoryMixin",
+    "Ae2ItemSearchMixin",
+    "Ae2FluidSearchMixin",
+    "Ae2InterfaceMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "refmap": "bettersearch.refmap.json"
+}

@@ -35,6 +35,8 @@ public final class SearchSettings {
 
     public boolean searchTomsStorage = true;
 
+    public boolean searchAe2 = true;
+
     public int typoTolerance = 2;
 
     public int minTypoLength = 4;
@@ -85,6 +87,7 @@ public final class SearchSettings {
         searchEmi = source.searchEmi;
         searchRei = source.searchRei;
         searchTomsStorage = source.searchTomsStorage;
+        searchAe2 = source.searchAe2;
         typoTolerance = source.typoTolerance;
         minTypoLength = source.minTypoLength;
         matchInitials = source.matchInitials;
@@ -171,6 +174,7 @@ public final class SearchSettings {
                 && searchEmi == s.searchEmi
                 && searchRei == s.searchRei
                 && searchTomsStorage == s.searchTomsStorage
+                && searchAe2 == s.searchAe2
                 && typoTolerance == s.typoTolerance
                 && minTypoLength == s.minTypoLength
                 && matchInitials == s.matchInitials
@@ -193,7 +197,7 @@ public final class SearchSettings {
         return java.util.Objects.hash(enabled, searchCreative, searchRecipeBook,
                 searchPlayerNames, searchCommandItems, fixCommandErrors, fixVersionNames,
                 commandSuggestionLimit,
-                searchJei, searchEmi, searchRei, searchTomsStorage,
+                searchJei, searchEmi, searchRei, searchTomsStorage, searchAe2,
                 typoTolerance, minTypoLength, matchInitials, ignoreSpaces,
                 crossLanguage, foreignStrictOnly, sortByRelevance, searchTooltips, searchItemIds,
                 searchModIds, fuzzyThreshold, crossFieldMatching, crossFieldThreshold, maxResults,

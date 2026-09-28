@@ -170,7 +170,7 @@ public final class LanguageTable {
     }
 
     private static boolean isInteresting(String key) {
-        return key.startsWith("item.") || key.startsWith("block.");
+        return com.rivalzin.bettersearch.core.SearchTranslations.includes(key);
     }
 
     private static String safeId(PackResources pack) {

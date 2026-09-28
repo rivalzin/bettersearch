@@ -1,0 +1,22 @@
+{
+  "required": false,
+  "minVersion": "0.8.4",
+  "package": "com.rivalzin.bettersearch.mixin.ae2",
+  "plugin": "com.rivalzin.bettersearch.mixin.ae2.Ae2MixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "Ae2EntryMixin",
+    "Ae2KeyMixin",
+    "Ae2ItemKeyMixin",
+    "Ae2NameMixin",
+    "Ae2SearchMixin",
+    "Ae2RepoMixin",
+    "Ae2StorageScreenMixin",
+    "Ae2PatternRecordMixin",
+    "Ae2PatternScreenMixin",
+    "Ae2LifecycleMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

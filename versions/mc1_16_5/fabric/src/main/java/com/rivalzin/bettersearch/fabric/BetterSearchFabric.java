@@ -24,6 +24,8 @@ public final class BetterSearchFabric implements ClientModInitializer {
                 .registerReloadListener(new FabricLanguageReloadListener());
 
         BetterSearchFabricKeys.register();
+        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
+                client -> com.rivalzin.bettersearch.client.Ae2Search.tick());
 
         BetterSearch.LOGGER.info("[{}] loaded, config: {}", BetterSearch.MOD_NAME, configFile);
     }

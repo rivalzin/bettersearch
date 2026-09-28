@@ -48,7 +48,8 @@ public final class ConfigIo {
             "maxResults: 0 = unlimited.",
             "searchJei / searchEmi / searchRei: use this same search inside JEI's, EMI's and",
             "  REI's item lists. There is no separate tuning for them on purpose: every option",
-            "  above applies there too, because it is the same index and the same matcher."
+            "  above applies there too, because it is the same index and the same matcher.",
+            "searchTomsStorage / searchAe2: enhance supported storage terminals with the same search settings."
     };
 
     private ConfigIo() {

@@ -115,5 +115,8 @@
   "bettersearch.key.alt": "Alt + %s",
   "bettersearch.config.search_toms_storage": "Terminalia Tom's Storage",
   "bettersearch.config.search_toms_storage.desc": "Quaestionem rerum in terminalibus Tom's Storage meliorat.",
-  "bettersearch.config.search_toms_storage.tip": "Tolerantiam mendorum et linguas electas addit. Tom's Storage sua filtra, formulas regulares, ordinem et omnes res conditas congruentes retinet."
+  "bettersearch.config.search_toms_storage.tip": "Tolerantiam mendorum et linguas electas addit. Tom's Storage sua filtra, formulas regulares, ordinem et omnes res conditas congruentes retinet.",
+  "bettersearch.config.search_ae2": "Terminalia Applied Energistics 2",
+  "bettersearch.config.search_ae2.desc": "Quaestiones in terminalibus AE2 congruentibus meliorat.",
+  "bettersearch.config.search_ae2.tip": "Tolerantiam mendorum et linguas electas quaestionibus rerum, liquidorum et exemplarium addit. AE2 sua filtra, syntaxin quaerendi, ordinem et omnes eventus congruentes retinet. Editio AE2 congruens requiritur."
 }

@@ -115,5 +115,8 @@
   "bettersearch.key.alt": "Alt + %s",
   "bettersearch.config.search_toms_storage": "Terminais do Tom's Storage",
   "bettersearch.config.search_toms_storage.desc": "Melhora a busca de itens nos terminais do Tom's Storage.",
-  "bettersearch.config.search_toms_storage.tip": "Acrescenta tolerância a erros e os idiomas ativos. Os filtros, expressões regulares, ordenação e todos os itens armazenados que correspondem à busca continuam sob controle do Tom's Storage."
+  "bettersearch.config.search_toms_storage.tip": "Acrescenta tolerância a erros e os idiomas ativos. Os filtros, expressões regulares, ordenação e todos os itens armazenados que correspondem à busca continuam sob controle do Tom's Storage.",
+  "bettersearch.config.search_ae2": "Terminais do Applied Energistics 2",
+  "bettersearch.config.search_ae2.desc": "Melhora as buscas nos terminais compatíveis do AE2.",
+  "bettersearch.config.search_ae2.tip": "Acrescenta tolerância a erros e os idiomas ativos às buscas de itens, fluidos e padrões. O AE2 mantém seus filtros, sintaxe de busca, ordenação e todos os resultados correspondentes. Requer uma versão compatível do AE2."
 }

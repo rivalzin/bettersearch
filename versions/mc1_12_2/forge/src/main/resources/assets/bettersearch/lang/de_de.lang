@@ -110,3 +110,6 @@ key.categories.bettersearch=Better Search
 bettersearch.key.alt=Alt + %s
 bettersearch.config.languages_all=All languages
 key.bettersearch.open=Better-Search-Einstellungen öffnen
+bettersearch.config.search_ae2=Terminals von Applied Energistics 2
+bettersearch.config.search_ae2.desc=Verbessert die Suche in unterstützten AE2-Terminals.
+bettersearch.config.search_ae2.tip=Ergänzt Fehlertoleranz und aktivierte Sprachen bei der Suche nach Gegenständen, Flüssigkeiten und Mustern. AE2 behält Filter, Suchsyntax, Sortierung und alle passenden Ergebnisse bei. Benötigt eine kompatible AE2-Version.

@@ -110,3 +110,6 @@ key.categories.bettersearch=Better Search
 bettersearch.key.alt=Alt + %s
 key.bettersearch.open=Optiones Better Search aperi
 bettersearch.config.languages_all=Omnes linguae
+bettersearch.config.search_ae2=Terminalia Applied Energistics 2
+bettersearch.config.search_ae2.desc=Quaestiones in terminalibus AE2 congruentibus meliorat.
+bettersearch.config.search_ae2.tip=Tolerantiam mendorum et linguas electas quaestionibus rerum, liquidorum et exemplarium addit. AE2 sua filtra, syntaxin quaerendi, ordinem et omnes eventus congruentes retinet. Editio AE2 congruens requiritur.

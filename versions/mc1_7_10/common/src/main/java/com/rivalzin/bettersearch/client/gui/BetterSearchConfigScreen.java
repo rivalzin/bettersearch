@@ -150,6 +150,8 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen implements 
                         v -> settings.searchCreative = v, DEFAULTS.searchCreative)
                         .preview(previewOf("search_creative"));
 
+                addToggle("search_ae2", () -> settings.searchAe2,
+                        v -> settings.searchAe2 = v, DEFAULTS.searchAe2);
                 addToggle("search_jei", () -> settings.searchJei,
                         v -> settings.searchJei = v, DEFAULTS.searchJei)
                         .preview(previewOf("search_nei"));

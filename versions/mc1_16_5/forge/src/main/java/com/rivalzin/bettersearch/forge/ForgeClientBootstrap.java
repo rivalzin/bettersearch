@@ -37,6 +37,11 @@ final class ForgeClientBootstrap {
                 ExtensionPoint.CONFIGGUIFACTORY,
                 () -> (minecraft, parent) -> new BetterSearchConfigScreen(parent));
         MinecraftForge.EVENT_BUS.addListener(BetterSearchForgeKeys::onClientTick);
+        MinecraftForge.EVENT_BUS.addListener((net.minecraftforge.event.TickEvent.ClientTickEvent event) -> {
+            if (event.phase == net.minecraftforge.event.TickEvent.Phase.END) {
+                com.rivalzin.bettersearch.client.Ae2Search.tick();
+            }
+        });
 
         BetterSearch.LOGGER.info("[{}] loaded, config: {}", BetterSearch.MOD_NAME, configFile);
     }

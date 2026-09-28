@@ -66,3 +66,10 @@ if (rootProject.file('tools/hei/run_tests.py').isFile()
         dependsOn tasks.named('heiCompatibilityTest')
     }
 }
+
+jar {
+    manifest {
+        attributes 'FMLCorePlugin': 'com.rivalzin.bettersearch.forge.ae2.Ae2LoadingPlugin',
+                'FMLCorePluginContainsFMLMod': 'true'
+    }
+}

@@ -23,6 +23,7 @@ public final class BetterSearchForge {
             MinecraftForge.EVENT_BUS.register(new SearchHook());
             FMLCommonHandler.instance().bus().register(new Keybinds());
             FMLCommonHandler.instance().bus().register(new IndexWarmer());
+            FMLCommonHandler.instance().bus().register(new com.rivalzin.bettersearch.forge.ae2.Ae2ClientEvents());
             BetterSearch.LOGGER.info("[{}] loaded (1.7.10), log backend: {}",
                     BetterSearch.MOD_NAME, BetterSearch.LOGGER.backend());
         }

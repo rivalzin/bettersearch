@@ -18,6 +18,7 @@ public final class BetterSearchForge {
                 "bettersearch.json").toPath());
         MinecraftForge.EVENT_BUS.register(new SearchHook());
         MinecraftForge.EVENT_BUS.register(new Keybinds());
+        MinecraftForge.EVENT_BUS.register(new com.rivalzin.bettersearch.forge.ae2.Ae2ClientEvents());
         BetterSearch.LOGGER.info("[{}] loaded (1.12.2), log backend: {}",
                 BetterSearch.MOD_NAME, BetterSearch.LOGGER.backend());
     }
