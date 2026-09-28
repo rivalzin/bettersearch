@@ -27,6 +27,13 @@ sourceSets {
     }
 }
 
+tasks.named('processResources') {
+    inputs.property 'version', project.version
+    filesMatching('mcmod.info') {
+        expand version: project.version
+    }
+}
+
 tasks.named('jar') {
     exclude 'codechicken/**'
 
