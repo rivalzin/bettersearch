@@ -164,6 +164,8 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
                 addToggle("search_jei", () -> settings.searchJei,
                         v -> settings.searchJei = v, DEFAULTS.searchJei)
                         .preview(previewOf("search_jei"));
+                addToggle("search_toms_storage", () -> settings.searchTomsStorage,
+                        v -> settings.searchTomsStorage = v, DEFAULTS.searchTomsStorage);
                 addToggle("search_rei", () -> settings.searchRei,
                         v -> settings.searchRei = v, DEFAULTS.searchRei)
                         .preview(previewOf("search_rei"));

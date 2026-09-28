@@ -112,5 +112,8 @@
   "bettersearch.config.value.ratio": "%s / %s",
   "key.categories.bettersearch": "Better Search",
   "key.bettersearch.open_config": "Apri le impostazioni di Better Search",
-  "bettersearch.key.alt": "Alt + %s"
+  "bettersearch.key.alt": "Alt + %s",
+  "bettersearch.config.search_toms_storage": "Terminali di Tom's Storage",
+  "bettersearch.config.search_toms_storage.desc": "Migliora la ricerca degli oggetti nei terminali di Tom's Storage.",
+  "bettersearch.config.search_toms_storage.tip": "Aggiunge tolleranza agli errori e le lingue attive. Tom's Storage mantiene filtri, espressioni regolari, ordinamento e tutti gli oggetti conservati corrispondenti."
 }

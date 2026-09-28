@@ -22,6 +22,7 @@ def lifecycleTestDir = layout.buildDirectory.dir('lifecycleTest')
 def enterTestDir = layout.buildDirectory.dir('enterTest')
 
 def latinTestDir = layout.buildDirectory.dir('latinTest')
+def storageTestDir = layout.buildDirectory.dir('storageTest')
 
 tasks.register('compileCoreTest', JavaCompile) {
     group = 'verification'
@@ -120,6 +121,32 @@ tasks.named('check') {
     if (file('tools/latin/BetterSearchLatinTest.java').isFile()) {
         dependsOn 'latinTest'
     }
+    if (file('tools/storage/StorageSearchSessionTest.java').isFile()) {
+        dependsOn 'storageTest'
+    }
+}
+
+tasks.register('compileStorageTest', JavaCompile) {
+    group = 'verification'
+    source = fileTree('core/src/main/java/com/rivalzin/bettersearch/core') +
+            fileTree('core/src/main/java/com/rivalzin/bettersearch/async') +
+            files('core/src/main/java/com/rivalzin/bettersearch/FailurePolicy.java',
+                    'tools/storage/StorageSearchSessionTest.java')
+    include '**/*.java'
+    classpath = files()
+    destinationDirectory = storageTestDir
+    options.encoding = 'UTF-8'
+    sourceCompatibility = '8'
+    targetCompatibility = '8'
+    options.release = 8
+}
+
+tasks.register('storageTest', JavaExec) {
+    group = 'verification'
+    dependsOn 'compileStorageTest'
+    classpath = files(storageTestDir)
+    mainClass = 'com.rivalzin.bettersearch.tools.StorageSearchSessionTest'
+    jvmArgs '-Dfile.encoding=UTF-8'
 }
 
 tasks.register('dist', Sync) {

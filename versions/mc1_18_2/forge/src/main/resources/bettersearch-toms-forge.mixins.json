@@ -1,0 +1,17 @@
+{
+  "required": false,
+  "minVersion": "0.8.4",
+  "package": "com.rivalzin.bettersearch.mixin.toms",
+  "plugin": "com.rivalzin.bettersearch.mixin.toms.TomsStorageMixinPlugin",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "TomsStorageStackAccessor",
+    "TomsStorageMenuAccessor",
+    "TomsStorageTerminalMixin",
+    "TomsStorageLifecycleMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "refmap": "bettersearch.refmap.json"
+}

@@ -27,6 +27,9 @@ config = "bettersearch-emi.mixins.json"
 [[mixins]]
 config = "bettersearch-rei.mixins.json"
 
+[[mixins]]
+config = "bettersearch-toms.mixins.json"
+
 [[dependencies.bettersearch]]
 modId = "neoforge"
 type = "required"
