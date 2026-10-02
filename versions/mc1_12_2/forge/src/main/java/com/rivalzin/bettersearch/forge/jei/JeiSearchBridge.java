@@ -19,6 +19,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 
@@ -135,6 +136,7 @@ public final class JeiSearchBridge {
         }
         Context key = context;
         return index.getPrepared(key, list.size(), 0L, () -> {
+            List<String> languages = settings.crossLanguage ? LangTable.activeCodes(settings) : Collections.emptyList();
             List<?> elements = new ArrayList<>(list);
             List<Integer> positions = new ArrayList<>(elements.size());
             for (int i = 0; i < elements.size(); i++) {
@@ -144,7 +146,7 @@ public final class JeiSearchBridge {
                 try {
                     IIngredientListElement<?> element = (IIngredientListElement<?>) elements.get(position);
                     EntrySnapshot<Integer> captured = new EntrySnapshot<>(position);
-                    fill(captured, element, settings);
+                    fill(captured, element, settings, languages);
                     return captured;
                 } catch (Exception | LinkageError error) {
                     FailurePolicy.rethrowFatal(error);
@@ -187,7 +189,7 @@ public final class JeiSearchBridge {
     }
 
     private static void fill(EntrySnapshot<Integer> builder, IIngredientListElement<?> element,
-                                  SearchSettings settings) {
+                                  SearchSettings settings, List<String> languages) {
         builder.add(element.getDisplayName(), SearchField.SOURCE_NATIVE);
 
         Object ingredient = element.getIngredient();
@@ -196,7 +198,7 @@ public final class JeiSearchBridge {
 
             if (settings.crossLanguage) {
                 String key = stack.getTranslationKey() + ".name";
-                for (String code : LangTable.activeCodes(settings)) {
+                for (String code : languages) {
                     String translated = LangTable.get(code, key);
                     if (translated != null) {
                         builder.add(translated, "en_us".equalsIgnoreCase(code)

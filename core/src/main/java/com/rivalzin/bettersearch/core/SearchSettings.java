@@ -224,6 +224,9 @@ public final class SearchSettings {
         if (a == null || b == null) {
             return false;
         }
+        if (a.equals(b)) {
+            return true;
+        }
         return new java.util.HashSet<>(a).equals(new java.util.HashSet<>(b));
     }
 

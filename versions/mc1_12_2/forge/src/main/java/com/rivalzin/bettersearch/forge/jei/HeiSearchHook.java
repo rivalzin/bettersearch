@@ -14,6 +14,14 @@ import java.util.Map;
 import java.util.Set;
 
 final class HeiSearchHook implements InvocationHandler {
+    private static final ClassValue<Field> READY_FIELDS = fields("afterBlock");
+    private static final ClassValue<Field> INDEX_FIELDS = fields("searchIndex");
+    private static final ClassValue<EngineAccess> ENGINES = new ClassValue<EngineAccess>() {
+        @Override
+        protected EngineAccess computeValue(Class<?> type) {
+            return new EngineAccess(type);
+        }
+    };
     private final Object original;
     private final Method allElements;
     private final Field tokenText;
@@ -40,7 +48,7 @@ final class HeiSearchHook implements InvocationHandler {
     }
 
     static boolean install(Object filter, Field elementSearchField) throws Exception {
-        Field ready = findField(filter.getClass(), "afterBlock");
+        Field ready = READY_FIELDS.get(filter.getClass());
         if (ready != null && !ready.getBoolean(filter)) {
             return false;
         }
@@ -48,21 +56,19 @@ final class HeiSearchHook implements InvocationHandler {
         if (engine == null || isWrapped(engine)) {
             return false;
         }
-        Field prefixes = findField(engine.getClass(), "prefixedSearchables");
-        if (prefixes == null) {
-            if (findField(engine.getClass(), "elementInfoList") == null) {
+        EngineAccess access = ENGINES.get(engine.getClass());
+        if (access.prefixes == null) {
+            if (!access.lowMemory) {
                 throw new NoSuchFieldException("Unsupported HEI search engine: " + engine.getClass().getName());
             }
             elementSearchField.set(filter, wrap(engine, elementSearchField.getType(), true));
             return true;
         }
-        Class<?> prefixType = Class.forName("mezz.jei.search.PrefixInfo", false, engine.getClass().getClassLoader());
-        Object noPrefix = prefixType.getField("NO_PREFIX").get(null);
-        Object searchable = ((Map<?, ?>) prefixes.get(engine)).get(noPrefix);
+        Object searchable = ((Map<?, ?>) access.prefixes.get(engine)).get(access.noPrefix());
         if (searchable == null) {
             return false;
         }
-        Field index = findField(searchable.getClass(), "searchIndex");
+        Field index = INDEX_FIELDS.get(searchable.getClass());
         if (index == null || !index.getType().isInterface()) {
             throw new NoSuchFieldException("HEI search index API is unavailable");
         }
@@ -81,6 +87,36 @@ final class HeiSearchHook implements InvocationHandler {
 
     private static boolean isWrapped(Object value) {
         return Proxy.isProxyClass(value.getClass()) && Proxy.getInvocationHandler(value) instanceof HeiSearchHook;
+    }
+
+    private static ClassValue<Field> fields(String name) {
+        return new ClassValue<Field>() {
+            @Override
+            protected Field computeValue(Class<?> type) {
+                return findField(type, name);
+            }
+        };
+    }
+
+    private static final class EngineAccess {
+        final Class<?> type;
+        final Field prefixes;
+        final boolean lowMemory;
+        private Object noPrefix;
+
+        EngineAccess(Class<?> type) {
+            this.type = type;
+            prefixes = findField(type, "prefixedSearchables");
+            lowMemory = prefixes == null && findField(type, "elementInfoList") != null;
+        }
+
+        synchronized Object noPrefix() throws Exception {
+            if (noPrefix == null) {
+                Class<?> prefixType = Class.forName("mezz.jei.search.PrefixInfo", false, type.getClassLoader());
+                noPrefix = prefixType.getField("NO_PREFIX").get(null);
+            }
+            return noPrefix;
+        }
     }
 
     static Field findField(Class<?> type, String name) {
@@ -143,7 +179,7 @@ final class HeiSearchHook implements InvocationHandler {
         }
         if ("put".equals(name) || "add".equals(name) || "addAll".equals(name)) {
             changed();
-        } else if ("getSearchResults".equals(name)) {
+        } else if ("getSearchResults".equals(name) && !HeiLookupScope.active()) {
             if (tokenText == null) {
                 addMatches((String) arguments[0], (Set<Object>) arguments[1]);
             } else if (tokenPrefix.get(arguments[0]) == noPrefix) {

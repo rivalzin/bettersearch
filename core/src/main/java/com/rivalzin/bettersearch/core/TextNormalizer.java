@@ -11,6 +11,9 @@ public final class TextNormalizer {
         if (input == null || input.isEmpty()) {
             return "";
         }
+        if (isNormalizedAscii(input)) {
+            return input;
+        }
 
         String lower = input.toLowerCase(Locale.ROOT);
 
@@ -60,6 +63,21 @@ public final class TextNormalizer {
             }
         }
         return out.toString();
+    }
+
+    private static boolean isNormalizedAscii(String input) {
+        boolean previousSpace = true;
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            if (c >= 'a' && c <= 'z' || c >= '0' && c <= '9') {
+                previousSpace = false;
+            } else if (c == ' ' && !previousSpace) {
+                previousSpace = true;
+            } else {
+                return false;
+            }
+        }
+        return !previousSpace;
     }
 
     private static void appendExpanded(StringBuilder expanded, char c) {

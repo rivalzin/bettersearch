@@ -34,6 +34,7 @@ public final class RsStorageSearch {
     private String previousQuery;
     private List<Object> previousValues;
     private boolean dirty = true;
+    private boolean refreshPending = true;
     private boolean closed;
 
     public RsStorageSearch(Screen owner, Runnable refresh) {
@@ -49,10 +50,11 @@ public final class RsStorageSearch {
 
     public void dirty() {
         dirty = true;
+        refreshPending = true;
     }
 
     public boolean needsRefresh() {
-        return !closed && (dirty || previousSettings == null || !previousSettings.equals(settings())
+        return !closed && (refreshPending || previousSettings == null || !previousSettings.equals(settings())
                 || previousLanguage != BetterSearchClient.languageStamp());
     }
 
@@ -67,12 +69,13 @@ public final class RsStorageSearch {
         long language = BetterSearchClient.languageStamp();
         boolean changed = previousSettings == null || !previousSettings.equals(settings)
                 || previousLanguage != language;
-        dirty |= changed || !Objects.equals(previousQuery, query);
+        refreshPending = false;
         previousSettings = settings;
         previousLanguage = language;
         if (dirty && settings.enabled && query != null && !query.isBlank()) {
             try {
                 inventory.update(RsApi.entries(repository), value -> value, value -> value);
+                dirty = false;
             } catch (RuntimeException | LinkageError error) {
                 FailurePolicy.rethrowFatal(error);
                 BetterSearch.LOGGER.error("[{}] incompatible Refined Storage repository",
@@ -81,7 +84,6 @@ public final class RsStorageSearch {
                 return;
             }
         }
-        dirty = false;
         List<Object> values = inventory.values();
         changed |= previousValues != values;
         previousValues = values;
