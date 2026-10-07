@@ -1,0 +1,9 @@
+{
+  "required": true,
+  "minVersion": "0.8.4",
+  "package": "com.rivalzin.bettersearch.mixin.languagereload",
+  "plugin": "com.rivalzin.bettersearch.mixin.languagereload.LanguageReloadTablePlugin",
+  "compatibilityLevel": "JAVA_21",
+  "client": ["LanguageReloadTableMixin"],
+  "injectors": {"defaultRequire": 1}
+}

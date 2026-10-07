@@ -55,3 +55,6 @@ config = "bettersearch-chestsearchbar.mixins.json"
 
 [[mixins]]
 config = "bettersearch-simplestorage.mixins.json"
+
+[[mixins]]
+config = "bettersearch-languagereload.mixins.json"
