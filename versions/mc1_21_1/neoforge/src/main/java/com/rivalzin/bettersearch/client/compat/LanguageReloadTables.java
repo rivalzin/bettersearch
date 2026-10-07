@@ -2,6 +2,9 @@ package com.rivalzin.bettersearch.client.compat;
 
 import java.lang.reflect.Field;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.BiConsumer;
 
 public final class LanguageReloadTables {
     private static final ClassValue<Access> ACCESS = new ClassValue<>() {
@@ -12,7 +15,11 @@ public final class LanguageReloadTables {
                 Field table = type.getDeclaredField("separateTranslations");
                 pending.setAccessible(true);
                 table.setAccessible(true);
-                return new Access(pending, table);
+                Field enabled = type.getClassLoader()
+                        .loadClass("org.hiedacamellia.languagereload.core.config.ClientConfig")
+                        .getDeclaredField("multilingualItemSearch");
+                enabled.setAccessible(true);
+                return new Access(pending, table, enabled);
             } catch (ReflectiveOperationException error) {
                 throw new IllegalStateException("Unsupported Language Reload translation storage", error);
             }
@@ -42,6 +49,26 @@ public final class LanguageReloadTables {
         }
     }
 
-    private record Access(Field pending, Field table) {
+    public static BiConsumer<String, String> capture(BiConsumer<String, String> original, Class<?> type, String code) {
+        Access access = ACCESS.get(type);
+        try {
+            if (!access.enabled.getBoolean(null)) {
+                return original;
+            }
+            Map<String, Map<String, String>> pending = (Map<String, Map<String, String>>) access.pending.get(null);
+            if (pending == null) {
+                return original;
+            }
+            Map<String, String> translations = pending.computeIfAbsent(code, key -> new HashMap<>());
+            return (key, value) -> {
+                original.accept(key, value);
+                translations.put(key, value);
+            };
+        } catch (IllegalAccessException error) {
+            throw new IllegalStateException("Could not capture Language Reload translations", error);
+        }
+    }
+
+    private record Access(Field pending, Field table, Field enabled) {
     }
 }

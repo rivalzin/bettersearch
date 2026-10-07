@@ -1,13 +1,14 @@
 package com.rivalzin.bettersearch.mixin.languagereload;
 
 import com.rivalzin.bettersearch.client.compat.LanguageReloadTables;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.minecraft.client.resources.language.ClientLanguage;
 import net.minecraft.server.packs.resources.ResourceManager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = ClientLanguage.class, priority = 1100)
 public abstract class LanguageReloadTableMixin {
@@ -16,10 +17,14 @@ public abstract class LanguageReloadTableMixin {
         LanguageReloadTables.initialize(this, ClientLanguage.class);
     }
 
-    @Inject(method = "loadFrom", at = @At("RETURN"))
-    private static void bettersearch$releaseTranslationTable(ResourceManager resources,
+    @WrapMethod(method = "loadFrom")
+    private static ClientLanguage bettersearch$releaseTranslationTable(ResourceManager resources,
             java.util.List<String> definitions, boolean rightToLeft,
-            CallbackInfoReturnable<ClientLanguage> cir) {
-        LanguageReloadTables.release(ClientLanguage.class);
+            Operation<ClientLanguage> original) {
+        try {
+            return original.call(resources, definitions, rightToLeft);
+        } finally {
+            LanguageReloadTables.release(ClientLanguage.class);
+        }
     }
 }
