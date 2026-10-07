@@ -136,5 +136,14 @@
   "bettersearch.config.search_toms_storage.desc": "Mejora la búsqueda de objetos en los terminales de Tom's Storage.",
   "bettersearch.config.search_toms_storage.tip": "Añade tolerancia a errores y los idiomas activos. Tom's Storage conserva sus filtros, expresiones regulares, ordenación y todos los objetos almacenados que coinciden.",
   "bettersearch.config.search_ae2.desc": "Mejora las búsquedas en los terminales compatibles de AE2.",
-  "bettersearch.config.search_ae2.tip": "Añade tolerancia a errores y los idiomas activos a las búsquedas de objetos, fluidos y patrones. AE2 conserva sus filtros, sintaxis de búsqueda, ordenación y todos los resultados coincidentes. Requiere una versión compatible de AE2."
+  "bettersearch.config.search_ae2.tip": "Añade tolerancia a errores y los idiomas activos a las búsquedas de objetos, fluidos y patrones. AE2 conserva sus filtros, sintaxis de búsqueda, ordenación y todos los resultados coincidentes. Requiere una versión compatible de AE2.",
+  "bettersearch.config.search_simple_storage_network": "Simple Storage Network",
+  "bettersearch.config.search_simple_storage_network.desc": "Mejora la búsqueda en los terminales de Simple Storage Network.",
+  "bettersearch.config.search_simple_storage_network.tip": "Usa las opciones de Better Search en los terminales.",
+  "bettersearch.config.search_chest_search_bar": "Chest Search Bar",
+  "bettersearch.config.search_chest_search_bar.desc": "Mejora la búsqueda de objetos en cofres y otros contenedores.",
+  "bettersearch.config.search_chest_search_bar.tip": "Usa las opciones de Better Search en Chest Search Bar.",
+  "bettersearch.config.sync_language_reload": "Sincronizar con Language Reload",
+  "bettersearch.config.sync_language_reload.desc": "Usa los mismos idiomas que Language Reload.",
+  "bettersearch.config.sync_language_reload.tip": "Desactívalo para elegir los idiomas de Better Search por separado."
 }

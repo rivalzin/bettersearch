@@ -1,0 +1,48 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "MIT"
+issueTrackerURL = "https://github.com/rivalzin/BetterSearch/issues"
+
+[[mods]]
+modId = "bettersearch"
+version = "${version}"
+displayName = "Better Search"
+authors = "rivalzin"
+displayURL = "https://www.youtube.com/@Rivalzln"
+logoFile = "SearchIconNEWICON512x512.png"
+logoBlur = false
+description = '''
+Makes search bars smarter and better!
+'''
+
+[[mixins]]
+config = "bettersearch.mixins.json"
+
+[[mixins]]
+config = "bettersearch-jei.mixins.json"
+
+[[mixins]]
+config = "bettersearch-emi.mixins.json"
+
+[[mixins]]
+config = "bettersearch-rei.mixins.json"
+
+[[mixins]]
+config = "bettersearch-toms.mixins.json"
+
+[[dependencies.bettersearch]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.5.0-beta,21.6)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.bettersearch]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.5,1.21.6)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[mixins]]
+config = "bettersearch-chestsearchbar.mixins.json"

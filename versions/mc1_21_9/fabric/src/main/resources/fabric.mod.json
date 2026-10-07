@@ -26,7 +26,8 @@
     "bettersearch.mixins.json",
     "bettersearch-jei.mixins.json",
     "bettersearch-emi.mixins.json",
-    "bettersearch-rei.mixins.json"
+    "bettersearch-rei.mixins.json",
+    "bettersearch-chestsearchbar.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.16.0",

@@ -1,0 +1,14 @@
+{
+  "required": false,
+  "minVersion": "0.8.4",
+  "package": "com.rivalzin.bettersearch.mixin.chestsearchbar",
+  "plugin": "com.rivalzin.bettersearch.mixin.chestsearchbar.ChestSearchBarMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "ChestSearchBarMixin",
+    "ChestSearchBarScreenMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

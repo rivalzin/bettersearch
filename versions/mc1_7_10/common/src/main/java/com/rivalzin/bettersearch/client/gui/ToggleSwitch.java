@@ -30,6 +30,10 @@ public final class ToggleSwitch extends GuiButton implements Pressable {
         set(!value);
     }
 
+    public boolean value() {
+        return value;
+    }
+
     private void set(boolean newValue) {
         if (this.enabled && this.visible && newValue != value) {
             animationFrom = animation();

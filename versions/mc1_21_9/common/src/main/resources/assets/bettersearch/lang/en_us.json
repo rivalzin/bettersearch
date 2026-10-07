@@ -136,5 +136,14 @@
   "bettersearch.config.search_toms_storage.desc": "Enhances item searches in Tom's Storage terminals.",
   "bettersearch.config.search_toms_storage.tip": "Adds typo tolerance and enabled languages. Tom's Storage keeps its filters, regular expressions, sorting and all matching stored items.",
   "bettersearch.config.search_ae2.desc": "Enhances searches in supported AE2 terminals.",
-  "bettersearch.config.search_ae2.tip": "Adds typo tolerance and enabled languages to item, fluid and pattern searches. AE2 keeps its filters, query syntax, sorting and all matching results. Requires a compatible AE2 version."
+  "bettersearch.config.search_ae2.tip": "Adds typo tolerance and enabled languages to item, fluid and pattern searches. AE2 keeps its filters, query syntax, sorting and all matching results. Requires a compatible AE2 version.",
+  "bettersearch.config.search_simple_storage_network": "Simple Storage Network",
+  "bettersearch.config.search_simple_storage_network.desc": "Improves search in Simple Storage Network terminals.",
+  "bettersearch.config.search_simple_storage_network.tip": "Uses Better Search options in the terminals.",
+  "bettersearch.config.search_chest_search_bar": "Chest Search Bar",
+  "bettersearch.config.search_chest_search_bar.desc": "Improves item search in chests and other containers.",
+  "bettersearch.config.search_chest_search_bar.tip": "Uses Better Search options in Chest Search Bar.",
+  "bettersearch.config.sync_language_reload": "Sync with Language Reload",
+  "bettersearch.config.sync_language_reload.desc": "Uses the same languages as Language Reload.",
+  "bettersearch.config.sync_language_reload.tip": "Turn off to choose Better Search languages separately."
 }

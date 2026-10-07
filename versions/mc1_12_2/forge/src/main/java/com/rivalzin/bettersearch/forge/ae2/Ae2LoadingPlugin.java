@@ -7,7 +7,7 @@ import net.minecraftforge.fml.relauncher.IFMLLoadingPlugin;
 @IFMLLoadingPlugin.TransformerExclusions({"com.rivalzin.bettersearch.forge.ae2", "com.rivalzin.bettersearch.forge.refinedstorage", "com.rivalzin.bettersearch.forge.jei.HeiLookupTransformer"})
 public final class Ae2LoadingPlugin implements IFMLLoadingPlugin {
     @Override
-    public String[] getASMTransformerClass() { return new String[]{Ae2Transformer.class.getName(), "com.rivalzin.bettersearch.forge.refinedstorage.RefinedStorageTransformer", "com.rivalzin.bettersearch.forge.jei.HeiLookupTransformer"}; }
+    public String[] getASMTransformerClass() { return new String[]{Ae2Transformer.class.getName(), "com.rivalzin.bettersearch.forge.refinedstorage.RefinedStorageTransformer", "com.rivalzin.bettersearch.forge.jei.HeiLookupTransformer", "com.rivalzin.bettersearch.forge.simplestorage.SimpleStorageTransformer"}; }
     @Override
     public String getModContainerClass() { return null; }
     @Override

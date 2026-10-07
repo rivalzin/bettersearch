@@ -48,6 +48,7 @@ def modules = [
 
         'versions:mc1_21_1:neoforge', 'versions:mc1_21_1:fabric',
         'versions:mc1_21_4:neoforge', 'versions:mc1_21_4:fabric',
+        'versions:mc1_21_5:neoforge', 'versions:mc1_21_5:fabric',
 
         'versions:mc1_21_9:neoforge', 'versions:mc1_21_9:fabric',
 

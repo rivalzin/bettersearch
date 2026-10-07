@@ -46,6 +46,10 @@ public final class ToggleSwitch extends AbstractWidget {
         set(!value);
     }
 
+    public boolean value() {
+        return value;
+    }
+
     private void set(boolean newValue) {
         if (this.active && this.visible && newValue != value) {
             animationFrom = animation();

@@ -1,0 +1,13 @@
+{
+  "required": false,
+  "minVersion": "0.8.4",
+  "package": "com.rivalzin.bettersearch.mixin.emi",
+  "plugin": "com.rivalzin.bettersearch.mixin.emi.EmiMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "SearchWorkerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

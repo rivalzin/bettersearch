@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8.4",
+  "package": "com.rivalzin.bettersearch.fabric.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "MinecraftSetScreenMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

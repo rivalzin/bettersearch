@@ -70,16 +70,34 @@ public abstract class OptionRowsScreen extends Screen {
             this.modified = modified;
         }
 
+        public Row enabled(boolean active) {
+            control.active = active;
+            if (reset != null) {
+                reset.active = active && modified.getAsBoolean();
+            }
+            return this;
+        }
+
         public Row requiresMod(String id) {
+            return requiresMod(id, title);
+        }
+
+        public Row requiresMod(String id, Component requiredMod) {
             control.active = IntegrationAvailability.available(id);
             if (reset != null) {
                 reset.active = control.active && modified.getAsBoolean();
             }
+            disabledIcon = modIcon(id + "_disabled");
             if (!control.active) {
-                requiredTip = Component.translatable(KEY_PREFIX + "integration_required", title);
-                disabledIcon = modIcon(id + "_disabled");
+                requiredTip = Component.translatable(KEY_PREFIX + "integration_required", requiredMod);
             }
             return this;
+        }
+
+        public ResourceLocation icon(int index) {
+            return disabledIcon != null && (!control.active
+                    || control instanceof ToggleSwitch && !((ToggleSwitch) control).value())
+                    ? disabledIcon : icons[index];
         }
 
         public Row icons(ResourceLocation... textures) {
@@ -584,7 +602,7 @@ public abstract class OptionRowsScreen extends Screen {
             int labelRight = row.control.x - 6;
             int iconCount = Math.min(row.icons.length, Math.max(0, (labelRight - labelX - 20) / 20));
             for (int i = 0; i < iconCount; i++) {
-                renderIcon(poseStack, row.disabledIcon != null ? row.disabledIcon : row.icons[i], labelX, top + 3);
+                renderIcon(poseStack, row.icon(i), labelX, top + 3);
                 labelX += 20;
             }
             int labelLimit = Math.max(0, labelRight - labelX);

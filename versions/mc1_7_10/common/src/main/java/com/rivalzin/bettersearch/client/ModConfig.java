@@ -27,6 +27,7 @@ public final class ModConfig {
 
     public static synchronized void load(Path path, int loadedModCount) {
         file = path;
+        LanguageReloadIntegration.bind(() -> settings.syncLanguageReload, ModConfig::settings, ModConfig::apply);
         SearchSettings loaded = ConfigIo.loadOrCreate(path, loadedModCount);
         if (loaded != null) {
             loaded = loaded.copy();
@@ -38,6 +39,7 @@ public final class ModConfig {
     public static synchronized void apply(SearchSettings updated) {
         updated = updated.copy();
         updated.sanitize();
+        LanguageReloadIntegration.synchronize(updated);
 
         if (updated.equals(settings)) {
             if (file != null && !java.nio.file.Files.exists(file)) {

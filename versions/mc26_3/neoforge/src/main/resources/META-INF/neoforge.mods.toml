@@ -43,3 +43,6 @@ type = "required"
 versionRange = "[26.3,26.4)"
 ordering = "NONE"
 side = "CLIENT"
+
+[[mixins]]
+config = "bettersearch-chestsearchbar.mixins.json"

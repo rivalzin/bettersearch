@@ -43,6 +43,12 @@ public final class SearchSettings {
 
     public boolean searchRefinedStorage = true;
 
+    public boolean searchSimpleStorageNetwork = true;
+
+    public boolean searchChestSearchBar = true;
+
+    public boolean syncLanguageReload = false;
+
     public int typoTolerance = 2;
 
     public int minTypoLength = 4;
@@ -97,6 +103,9 @@ public final class SearchSettings {
         searchTomsStorage = source.searchTomsStorage;
         searchAe2 = source.searchAe2;
         searchRefinedStorage = source.searchRefinedStorage;
+        searchSimpleStorageNetwork = source.searchSimpleStorageNetwork;
+        searchChestSearchBar = source.searchChestSearchBar;
+        syncLanguageReload = source.syncLanguageReload;
         typoTolerance = source.typoTolerance;
         minTypoLength = source.minTypoLength;
         matchInitials = source.matchInitials;
@@ -187,6 +196,9 @@ public final class SearchSettings {
                 && searchTomsStorage == s.searchTomsStorage
                 && searchAe2 == s.searchAe2
                 && searchRefinedStorage == s.searchRefinedStorage
+                && searchSimpleStorageNetwork == s.searchSimpleStorageNetwork
+                && searchChestSearchBar == s.searchChestSearchBar
+                && syncLanguageReload == s.syncLanguageReload
                 && typoTolerance == s.typoTolerance
                 && minTypoLength == s.minTypoLength
                 && matchInitials == s.matchInitials
@@ -210,7 +222,7 @@ public final class SearchSettings {
                 searchPlayerNames, searchCommandItems, fixCommandErrors, fixVersionNames,
                 commandSuggestionLimit,
                 searchJei, searchHei, searchNei, searchEmi, searchRei, searchTomsStorage, searchAe2,
-                searchRefinedStorage,
+                searchRefinedStorage, searchSimpleStorageNetwork, searchChestSearchBar, syncLanguageReload,
                 typoTolerance, minTypoLength, matchInitials, ignoreSpaces,
                 crossLanguage, foreignStrictOnly, sortByRelevance, searchTooltips, searchItemIds,
                 searchModIds, fuzzyThreshold, crossFieldMatching, crossFieldThreshold, maxResults,

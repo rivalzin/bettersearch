@@ -75,6 +75,17 @@ public final class IntegrationAvailability {
                                 "com.refinedmods.refinedstorage.common.grid.AbstractGridContainerMenu",
                                 "com.refinedmods.refinedstorage.common.grid.query.GridQueryParser",
                                 "com.refinedmods.refinedstorage.api.resource.repository.ResourceRepositoryImpl");
+            case "simple_storage_network":
+                return classes.test(OWN + "client.simplestorage.SimpleStorageSearch")
+                        && any(classes, "mrriegel.storagenetwork.gui.GuiContainerStorageInventory",
+                                "com.lothrazar.storagenetwork.gui.NetworkWidget",
+                                "com.lothrazar.storagenetwork.gui.DefaultNetworkWidget");
+            case "chest_search_bar":
+                return all(classes, OWN + "mixin.chestsearchbar.ChestSearchBarMixin",
+                        "cgcm.chestsearchbar.search.ContainerSearcher");
+            case "language_reload":
+                return any(classes, "jerozgen.languagereload.config.Config",
+                        "com.euphony.neo_language_reload.config.Config");
             default:
                 return false;
         }
@@ -118,10 +129,13 @@ public final class IntegrationAvailability {
         private static Map<String, Boolean> load() {
             Map<String, Boolean> values = new HashMap<>();
             for (String id : new String[]{"jei", "hei", "nei", "emi", "rei", "ae2",
-                    "toms_storage", "refined_storage"}) {
+                    "toms_storage", "refined_storage", "simple_storage_network", "chest_search_bar", "language_reload"}) {
                 boolean available = detect(id, IntegrationAvailability::hasClass);
                 if (available && "ae2".equals(id)) {
                     available = legacyAe2Compatible();
+                }
+                if (available && "language_reload".equals(id)) {
+                    available = LanguageReloadIntegration.available();
                 }
                 values.put(id, available);
             }

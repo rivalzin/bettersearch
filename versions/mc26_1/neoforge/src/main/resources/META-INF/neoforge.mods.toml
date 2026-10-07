@@ -49,3 +49,9 @@ side = "CLIENT"
 
 [[mixins]]
 config = "bettersearch-refinedstorage.mixins.json"
+
+[[mixins]]
+config = "bettersearch-chestsearchbar.mixins.json"
+
+[[mixins]]
+config = "bettersearch-simplestorage.mixins.json"

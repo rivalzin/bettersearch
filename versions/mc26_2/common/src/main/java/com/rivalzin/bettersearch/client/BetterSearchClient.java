@@ -60,6 +60,7 @@ public final class BetterSearchClient {
     public static synchronized void setSettings(SearchSettings updated) {
         SearchSettings incoming = updated.copy();
         incoming.sanitize();
+        LanguageReloadIntegration.synchronize(incoming);
         SearchSettings previous = settings;
         if (incoming.equals(previous)) {
             return;
@@ -205,11 +206,14 @@ public final class BetterSearchClient {
 
     public static void setConfigFile(Path file) {
         configFile = file;
+        LanguageReloadIntegration.bind(() -> settings.syncLanguageReload,
+                BetterSearchClient::settings, BetterSearchClient::applyAndSave);
     }
 
     public static void applyAndSave(SearchSettings updated) {
         SearchSettings incoming = updated.copy();
         incoming.sanitize();
+        LanguageReloadIntegration.synchronize(incoming);
         boolean changed = !incoming.equals(settings);
         setSettings(incoming);
         Path file = configFile;

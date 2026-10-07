@@ -44,6 +44,8 @@ public final class BetterSearchForgeKeys {
 
         BetterSearchClient.warmUp();
 
+        com.rivalzin.bettersearch.client.LanguageReloadIntegration.tick();
+
         KeyConflictGuard.update(OPEN_CONFIG, OPEN_CONFIG.getKeyModifier() == KeyModifier.ALT);
 
         while (OPEN_CONFIG.consumeClick()) {

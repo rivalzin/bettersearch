@@ -1,0 +1,18 @@
+{
+  "required": true,
+  "minVersion": "0.8.4",
+  "package": "com.rivalzin.bettersearch.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "CreativeModeInventoryScreenMixin",
+    "CreativeScreenAccessor",
+    "RecipeBookComponentMixin",
+    "CommandSuggestionsMixin",
+    "ChatScreenMixin",
+    "KeyMappingMixin",
+    "KeyMappingClickMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -136,5 +136,14 @@
   "bettersearch.config.search_nei.desc": "Melhora a busca na lista de itens do NEI.",
   "bettersearch.config.search_nei.tip": "Usa suas opções de busca nos campos compatíveis do NEI, preservando os filtros próprios do mod.",
   "bettersearch.config.search_refined_storage.desc": "Melhora a busca nos terminais do Refined Storage.",
-  "bettersearch.config.search_refined_storage.tip": "Acrescenta tolerância a erros e os idiomas ativos às buscas de itens, fluidos e padrões. O Refined Storage mantém seus filtros, sintaxe de busca, ordenação e todos os recursos armazenados correspondentes."
+  "bettersearch.config.search_refined_storage.tip": "Acrescenta tolerância a erros e os idiomas ativos às buscas de itens, fluidos e padrões. O Refined Storage mantém seus filtros, sintaxe de busca, ordenação e todos os recursos armazenados correspondentes.",
+  "bettersearch.config.search_simple_storage_network": "Simple Storage Network",
+  "bettersearch.config.search_simple_storage_network.desc": "Melhora a busca nos terminais do Simple Storage Network.",
+  "bettersearch.config.search_simple_storage_network.tip": "Usa as opções do Better Search nos terminais.",
+  "bettersearch.config.search_chest_search_bar": "Chest Search Bar",
+  "bettersearch.config.search_chest_search_bar.desc": "Melhora a busca de itens em baús e outros contêineres.",
+  "bettersearch.config.search_chest_search_bar.tip": "Usa as opções do Better Search no Chest Search Bar.",
+  "bettersearch.config.sync_language_reload": "Sincronizar com o Language Reload",
+  "bettersearch.config.sync_language_reload.desc": "Usa os mesmos idiomas do Language Reload.",
+  "bettersearch.config.sync_language_reload.tip": "Desligue para escolher os idiomas do Better Search separadamente."
 }

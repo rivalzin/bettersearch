@@ -50,7 +50,9 @@ public final class ConfigIo {
             "searchJei / searchHei / searchNei / searchEmi / searchRei: use the same search",
             "  inside supported recipe browsers. Every search option",
             "  above applies there too, because it is the same index and the same matcher.",
-            "searchTomsStorage / searchAe2 / searchRefinedStorage: enhance supported storage terminals with the same search settings."
+            "searchTomsStorage / searchAe2 / searchRefinedStorage / searchSimpleStorageNetwork: enhance supported storage terminals.",
+            "searchChestSearchBar: enhance Chest Search Bar item matching.",
+            "syncLanguageReload: keep Better Search languages in sync with Language Reload."
     };
 
     private ConfigIo() {
@@ -70,6 +72,9 @@ public final class ConfigIo {
         boolean missing = Files.notExists(file);
         if (missing && loadedModCount > 64) {
             settings.languages = FirstBootLanguages.forLocale(computerLocale);
+        }
+        if (missing) {
+            LanguageReloadIntegration.importInitial(settings, file);
         }
         if (!missing) {
             try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {

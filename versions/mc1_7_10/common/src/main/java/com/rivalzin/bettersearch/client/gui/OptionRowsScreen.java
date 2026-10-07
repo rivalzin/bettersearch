@@ -60,16 +60,34 @@ public abstract class OptionRowsScreen extends GuiScreen {
             this.modified = modified;
         }
 
+        public Row enabled(boolean active) {
+            control.enabled = active;
+            if (reset != null) {
+                reset.enabled = active && modified.getAsBoolean();
+            }
+            return this;
+        }
+
         public Row requiresMod(String id) {
+            return requiresMod(id, title);
+        }
+
+        public Row requiresMod(String id, String requiredMod) {
             control.enabled = IntegrationAvailability.available(id);
             if (reset != null) {
                 reset.enabled = control.enabled && modified.getAsBoolean();
             }
+            disabledIcon = modIcon(id + "_disabled");
             if (!control.enabled) {
-                requiredTip = ComponentCompat.translatable(KEY_PREFIX + "integration_required", title);
-                disabledIcon = modIcon(id + "_disabled");
+                requiredTip = ComponentCompat.translatable(KEY_PREFIX + "integration_required", requiredMod);
             }
             return this;
+        }
+
+        public ResourceLocation icon(int index) {
+            return disabledIcon != null && (!control.enabled
+                    || control instanceof ToggleSwitch && !((ToggleSwitch) control).value())
+                    ? disabledIcon : icons[index];
         }
 
         public Row icons(ResourceLocation... textures) {
@@ -659,7 +677,7 @@ public abstract class OptionRowsScreen extends GuiScreen {
             int labelRight = row.control.xPosition - 6;
             int iconCount = Math.min(row.icons.length, Math.max(0, (labelRight - labelX - 20) / 20));
             for (int i = 0; i < iconCount; i++) {
-                renderIcon(row.disabledIcon != null ? row.disabledIcon : row.icons[i], labelX, top + 3);
+                renderIcon(row.icon(i), labelX, top + 3);
                 labelX += 20;
             }
             int labelLimit = Math.max(0, labelRight - labelX);

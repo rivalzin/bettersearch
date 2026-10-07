@@ -3,6 +3,7 @@ package com.rivalzin.bettersearch.client.gui;
 import com.rivalzin.bettersearch.client.BetterSearchClient;
 import com.rivalzin.bettersearch.client.LanguageCatalog;
 import com.rivalzin.bettersearch.client.IntegrationAvailability;
+import com.rivalzin.bettersearch.client.LanguageReloadIntegration;
 import com.rivalzin.bettersearch.core.SearchSettings;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.ConfirmLinkScreen;
@@ -72,6 +73,15 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
         }
         if (!IntegrationAvailability.available("refined_storage")) {
             defaults.searchRefinedStorage = settings.searchRefinedStorage;
+        }
+        if (!IntegrationAvailability.available("simple_storage_network")) {
+            defaults.searchSimpleStorageNetwork = settings.searchSimpleStorageNetwork;
+        }
+        if (!IntegrationAvailability.available("chest_search_bar")) {
+            defaults.searchChestSearchBar = settings.searchChestSearchBar;
+        }
+        if (!IntegrationAvailability.available("language_reload")) {
+            defaults.syncLanguageReload = settings.syncLanguageReload;
         }
         return defaults;
     }
@@ -170,8 +180,17 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
                 addToggle("cross_field", () -> settings.crossFieldMatching,
                         v -> settings.crossFieldMatching = v, DEFAULTS.crossFieldMatching)
                         .preview(previewOf("cross_field"));
+                addToggle("sync_language_reload", () -> settings.syncLanguageReload,
+                        v -> {
+                            settings.syncLanguageReload = v;
+                            LanguageReloadIntegration.synchronize(settings);
+                            deferRebuild();
+                        }, DEFAULTS.syncLanguageReload)
+                        .requiresMod("language_reload", Component.literal("Language Reload"))
+                        .icons(modIcon("language_reload"));
                 addAction("enabled_languages", enabledLanguagesLabel(),
-                        () -> this.minecraft.gui.setScreen(new LanguageSelectScreen(this, settings)));
+                        () -> this.minecraft.gui.setScreen(new LanguageSelectScreen(this, settings)))
+                        .enabled(!settings.syncLanguageReload || !IntegrationAvailability.available("language_reload"));
             }
             case ADVANCED -> {
                 addToggle("search_creative", () -> settings.searchCreative,
@@ -232,6 +251,14 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
                             v -> settings.searchRefinedStorage = v, DEFAULTS.searchRefinedStorage)
                             .requiresMod("refined_storage")
                             .icons(modIcon("refined_storage"));
+                    addToggle("search_simple_storage_network", () -> settings.searchSimpleStorageNetwork,
+                            v -> settings.searchSimpleStorageNetwork = v, DEFAULTS.searchSimpleStorageNetwork)
+                            .requiresMod("simple_storage_network")
+                            .icons(modIcon("simple_storage_network"));
+                    addToggle("search_chest_search_bar", () -> settings.searchChestSearchBar,
+                            v -> settings.searchChestSearchBar = v, DEFAULTS.searchChestSearchBar)
+                            .requiresMod("chest_search_bar")
+                            .icons(modIcon("chest_search_bar"));
                 }
                 addSlider("command_suggestion_limit", 1, SUGGESTION_LIMIT_MAX, 1,
                         () -> settings.commandSuggestionLimit,

@@ -36,6 +36,7 @@ public final class BetterSearchFabricKeys {
         ShortcutWatcher.prioritize(event -> needsAlt() && OPEN_CONFIG.matches(event));
         KeyConflictGuard.listenAlt(() -> Minecraft.getInstance().hasAltDown());
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            com.rivalzin.bettersearch.client.LanguageReloadIntegration.tick();
             KeyConflictGuard.update(OPEN_CONFIG, needsAlt());
             while (OPEN_CONFIG.consumeClick()) {
 

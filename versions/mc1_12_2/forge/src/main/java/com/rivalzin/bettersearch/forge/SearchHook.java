@@ -42,6 +42,7 @@ public final class SearchHook {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
+        com.rivalzin.bettersearch.client.LanguageReloadIntegration.tick();
         installNeiHook();
 
         if (Minecraft.getMinecraft().player != null) {

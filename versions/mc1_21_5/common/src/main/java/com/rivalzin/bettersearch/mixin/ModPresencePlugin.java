@@ -1,0 +1,113 @@
+package com.rivalzin.bettersearch.mixin;
+
+import org.objectweb.asm.tree.ClassNode;
+import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
+import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
+
+import java.util.List;
+import java.util.Set;
+
+public abstract class ModPresencePlugin implements IMixinConfigPlugin {
+    private final String modId;
+    private final String targetResource;
+    private boolean present;
+
+    protected ModPresencePlugin(String modId, String targetResource) {
+        this.modId = modId;
+        this.targetResource = targetResource;
+    }
+
+    @Override
+    public final void onLoad(String mixinPackage) {
+        present = detect();
+    }
+
+    private boolean detect() {
+        Boolean early = viaLoadingModList("net.neoforged.fml.loading.LoadingModList");
+        if (Boolean.TRUE.equals(early)) {
+            return early;
+        }
+        early = viaLoadingModList("net.minecraftforge.fml.loading.LoadingModList");
+        if (Boolean.TRUE.equals(early)) {
+            return early;
+        }
+        Boolean list = viaModList("net.neoforged.fml.ModList");
+        if (Boolean.TRUE.equals(list)) {
+            return list;
+        }
+        list = viaModList("net.minecraftforge.fml.ModList");
+        if (Boolean.TRUE.equals(list)) {
+            return list;
+        }
+        try {
+            Class<?> loader = Class.forName("net.fabricmc.loader.api.FabricLoader");
+            Object instance = loader.getMethod("getInstance").invoke(null);
+            Object loaded = loader.getMethod("isModLoaded", String.class).invoke(instance, modId);
+            if (Boolean.TRUE.equals(loaded)) {
+                return true;
+            }
+        } catch (Exception | LinkageError ignored) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(ignored);
+        }
+
+        return getClass().getClassLoader().getResource(targetResource) != null;
+    }
+
+    private Boolean viaLoadingModList(String className) {
+        try {
+            Class<?> type = Class.forName(className);
+            Object instance = type.getMethod("get").invoke(null);
+            if (instance == null) {
+                return null;
+            }
+            return type.getMethod("getModFileById", String.class).invoke(instance, modId) != null;
+        } catch (Exception | LinkageError ignored) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(ignored);
+            return null;
+        }
+    }
+
+    private Boolean viaModList(String className) {
+        try {
+            Class<?> type = Class.forName(className);
+            Object instance = type.getMethod("get").invoke(null);
+            if (instance == null) {
+                return null;
+            }
+            return Boolean.TRUE.equals(type.getMethod("isLoaded", String.class).invoke(instance, modId));
+        } catch (Exception | LinkageError ignored) {
+            com.rivalzin.bettersearch.FailurePolicy.rethrowFatal(ignored);
+            return null;
+        }
+    }
+
+    @Override
+
+    public final boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+        return present;
+    }
+
+    @Override
+    public String getRefMapperConfig() {
+        return null;
+    }
+
+    @Override
+    public void acceptTargets(Set<String> myTargets, Set<String> otherTargets) {
+    }
+
+    @Override
+    public List<String> getMixins() {
+        return null;
+    }
+
+    @Override
+    public void preApply(String targetClassName, ClassNode targetClass,
+                         String mixinClassName, IMixinInfo mixinInfo) {
+    }
+
+    @Override
+    public void postApply(String targetClassName, ClassNode targetClass,
+                          String mixinClassName, IMixinInfo mixinInfo) {
+    }
+}

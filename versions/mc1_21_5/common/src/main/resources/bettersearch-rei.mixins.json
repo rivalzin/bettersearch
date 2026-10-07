@@ -1,0 +1,14 @@
+{
+  "required": false,
+  "minVersion": "0.8.4",
+  "package": "com.rivalzin.bettersearch.mixin.rei",
+  "plugin": "com.rivalzin.bettersearch.mixin.rei.ReiMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "SearchProviderImplMixin",
+    "EntryListSearchManagerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

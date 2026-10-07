@@ -10,6 +10,9 @@ public final class Ae2ClientEvents {
         if (event.phase == TickEvent.Phase.END) {
             Ae2Search.tick();
             com.rivalzin.bettersearch.client.refinedstorage.RefinedStorageSearch.tick();
+            if (com.rivalzin.bettersearch.client.IntegrationAvailability.available("simple_storage_network")) {
+                com.rivalzin.bettersearch.client.simplestorage.SimpleStorageSearch.closeInactive();
+            }
         }
     }
 }

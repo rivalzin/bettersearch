@@ -20,6 +20,7 @@ public final class IndexWarmer {
         if (event.phase != TickEvent.Phase.END) {
             return;
         }
+        com.rivalzin.bettersearch.client.LanguageReloadIntegration.tick();
         installNeiHook();
         askNeiAgainIfSettingsChanged();
         if (Minecraft.getMinecraft().thePlayer == null) {
