@@ -1,0 +1,14 @@
+{
+  "required": false,
+  "minVersion": "0.8.4",
+  "package": "com.rivalzin.bettersearch.mixin.sophisticated",
+  "plugin": "com.rivalzin.bettersearch.mixin.sophisticated.SophisticatedMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "SophisticatedScreenMixin",
+    "SophisticatedLifecycleMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

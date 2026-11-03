@@ -52,6 +52,7 @@ public final class ConfigIo {
             "  above applies there too, because it is the same index and the same matcher.",
             "searchTomsStorage / searchAe2 / searchRefinedStorage / searchSimpleStorageNetwork: enhance supported storage terminals.",
             "searchChestSearchBar: enhance Chest Search Bar item matching.",
+            "searchSophisticatedBackpacks / searchSophisticatedStorage: enhance supported backpack and storage search bars.",
             "syncLanguageReload: keep Better Search languages in sync with Language Reload."
     };
 

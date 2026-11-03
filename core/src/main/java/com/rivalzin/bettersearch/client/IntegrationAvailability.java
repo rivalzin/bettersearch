@@ -83,6 +83,14 @@ public final class IntegrationAvailability {
             case "chest_search_bar":
                 return all(classes, OWN + "mixin.chestsearchbar.ChestSearchBarMixin",
                         "cgcm.chestsearchbar.search.ContainerSearcher");
+            case "sophisticated_backpacks":
+                return all(classes, OWN + "mixin.sophisticated.SophisticatedMixinPlugin",
+                        "net.p3pp3rf1y.sophisticatedcore.client.gui.StorageScreenBase",
+                        "net.p3pp3rf1y.sophisticatedbackpacks.client.gui.BackpackScreen");
+            case "sophisticated_storage":
+                return all(classes, OWN + "mixin.sophisticated.SophisticatedMixinPlugin",
+                        "net.p3pp3rf1y.sophisticatedcore.client.gui.StorageScreenBase",
+                        "net.p3pp3rf1y.sophisticatedstorage.client.gui.StorageScreen");
             case "language_reload":
                 return any(classes, "jerozgen.languagereload.config.Config",
                         "com.euphony.neo_language_reload.config.Config");
@@ -129,13 +137,17 @@ public final class IntegrationAvailability {
         private static Map<String, Boolean> load() {
             Map<String, Boolean> values = new HashMap<>();
             for (String id : new String[]{"jei", "hei", "nei", "emi", "rei", "ae2",
-                    "toms_storage", "refined_storage", "simple_storage_network", "chest_search_bar", "language_reload"}) {
+                    "toms_storage", "refined_storage", "simple_storage_network", "chest_search_bar", "language_reload",
+                    "sophisticated_backpacks", "sophisticated_storage"}) {
                 boolean available = detect(id, IntegrationAvailability::hasClass);
                 if (available && "ae2".equals(id)) {
                     available = legacyAe2Compatible();
                 }
                 if (available && "language_reload".equals(id)) {
                     available = LanguageReloadIntegration.available();
+                }
+                if (available && ("sophisticated_backpacks".equals(id) || "sophisticated_storage".equals(id))) {
+                    available = SophisticatedPresence.available("sophisticated_backpacks".equals(id));
                 }
                 values.put(id, available);
             }

@@ -145,5 +145,11 @@
   "bettersearch.config.search_chest_search_bar.tip": "Usa las opciones de Better Search en Chest Search Bar.",
   "bettersearch.config.sync_language_reload": "Sincronizar con Language Reload",
   "bettersearch.config.sync_language_reload.desc": "Usa los mismos idiomas que Language Reload.",
-  "bettersearch.config.sync_language_reload.tip": "Desactívalo para elegir los idiomas de Better Search por separado."
+  "bettersearch.config.sync_language_reload.tip": "Desactívalo para elegir los idiomas de Better Search por separado.",
+  "bettersearch.config.search_sophisticated_backpacks": "Sophisticated Backpacks",
+  "bettersearch.config.search_sophisticated_backpacks.desc": "Mejora la búsqueda en Sophisticated Backpacks.",
+  "bettersearch.config.search_sophisticated_backpacks.tip": "Usa las opciones de Better Search en la búsqueda de la mochila.",
+  "bettersearch.config.search_sophisticated_storage": "Sophisticated Storage",
+  "bettersearch.config.search_sophisticated_storage.desc": "Mejora la búsqueda en Sophisticated Storage.",
+  "bettersearch.config.search_sophisticated_storage.tip": "Usa las opciones de Better Search en la búsqueda del almacenamiento."
 }

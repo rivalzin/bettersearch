@@ -47,6 +47,10 @@ public final class SearchSettings {
 
     public boolean searchChestSearchBar = true;
 
+    public boolean searchSophisticatedBackpacks = true;
+
+    public boolean searchSophisticatedStorage = true;
+
     public boolean syncLanguageReload = false;
 
     public int typoTolerance = 2;
@@ -105,6 +109,8 @@ public final class SearchSettings {
         searchRefinedStorage = source.searchRefinedStorage;
         searchSimpleStorageNetwork = source.searchSimpleStorageNetwork;
         searchChestSearchBar = source.searchChestSearchBar;
+        searchSophisticatedBackpacks = source.searchSophisticatedBackpacks;
+        searchSophisticatedStorage = source.searchSophisticatedStorage;
         syncLanguageReload = source.syncLanguageReload;
         typoTolerance = source.typoTolerance;
         minTypoLength = source.minTypoLength;
@@ -198,6 +204,8 @@ public final class SearchSettings {
                 && searchRefinedStorage == s.searchRefinedStorage
                 && searchSimpleStorageNetwork == s.searchSimpleStorageNetwork
                 && searchChestSearchBar == s.searchChestSearchBar
+                && searchSophisticatedBackpacks == s.searchSophisticatedBackpacks
+                && searchSophisticatedStorage == s.searchSophisticatedStorage
                 && syncLanguageReload == s.syncLanguageReload
                 && typoTolerance == s.typoTolerance
                 && minTypoLength == s.minTypoLength
@@ -222,7 +230,8 @@ public final class SearchSettings {
                 searchPlayerNames, searchCommandItems, fixCommandErrors, fixVersionNames,
                 commandSuggestionLimit,
                 searchJei, searchHei, searchNei, searchEmi, searchRei, searchTomsStorage, searchAe2,
-                searchRefinedStorage, searchSimpleStorageNetwork, searchChestSearchBar, syncLanguageReload,
+                searchRefinedStorage, searchSimpleStorageNetwork, searchChestSearchBar,
+                searchSophisticatedBackpacks, searchSophisticatedStorage, syncLanguageReload,
                 typoTolerance, minTypoLength, matchInitials, ignoreSpaces,
                 crossLanguage, foreignStrictOnly, sortByRelevance, searchTooltips, searchItemIds,
                 searchModIds, fuzzyThreshold, crossFieldMatching, crossFieldThreshold, maxResults,

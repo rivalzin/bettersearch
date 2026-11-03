@@ -83,6 +83,12 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
         if (!IntegrationAvailability.available("language_reload")) {
             defaults.syncLanguageReload = settings.syncLanguageReload;
         }
+        if (!IntegrationAvailability.available("sophisticated_backpacks")) {
+            defaults.searchSophisticatedBackpacks = settings.searchSophisticatedBackpacks;
+        }
+        if (!IntegrationAvailability.available("sophisticated_storage")) {
+            defaults.searchSophisticatedStorage = settings.searchSophisticatedStorage;
+        }
         return defaults;
     }
 
@@ -259,6 +265,14 @@ public final class BetterSearchConfigScreen extends OptionRowsScreen {
                             v -> settings.searchChestSearchBar = v, DEFAULTS.searchChestSearchBar)
                             .requiresMod("chest_search_bar")
                             .icons(modIcon("chest_search_bar"));
+                    addToggle("search_sophisticated_backpacks", () -> settings.searchSophisticatedBackpacks,
+                            v -> settings.searchSophisticatedBackpacks = v, DEFAULTS.searchSophisticatedBackpacks)
+                            .requiresMod("sophisticated_backpacks")
+                            .icons(modIcon("sophisticated_backpacks"));
+                    addToggle("search_sophisticated_storage", () -> settings.searchSophisticatedStorage,
+                            v -> settings.searchSophisticatedStorage = v, DEFAULTS.searchSophisticatedStorage)
+                            .requiresMod("sophisticated_storage")
+                            .icons(modIcon("sophisticated_storage"));
                 }
                 addSlider("command_suggestion_limit", 1, SUGGESTION_LIMIT_MAX, 1,
                         () -> settings.commandSuggestionLimit,

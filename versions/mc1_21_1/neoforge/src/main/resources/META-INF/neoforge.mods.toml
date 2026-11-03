@@ -58,3 +58,6 @@ config = "bettersearch-simplestorage.mixins.json"
 
 [[mixins]]
 config = "bettersearch-languagereload.mixins.json"
+
+[[mixins]]
+config = "bettersearch-sophisticated.mixins.json"
