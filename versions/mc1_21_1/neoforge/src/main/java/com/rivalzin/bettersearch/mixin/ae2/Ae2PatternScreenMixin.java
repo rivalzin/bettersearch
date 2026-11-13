@@ -1,5 +1,6 @@
 package com.rivalzin.bettersearch.mixin.ae2;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.rivalzin.bettersearch.client.ae2.Ae2KeyAccess;
 import com.rivalzin.bettersearch.client.ae2.Ae2PatternRecordAccess;
 import com.rivalzin.bettersearch.client.ae2.Ae2PatternSearch;
@@ -94,10 +95,12 @@ public abstract class Ae2PatternScreenMixin implements Ae2ScreenAccess {
         return ((Ae2PatternRecordAccess) record).getSearchName();
     }
 
-    @Redirect(method = "refreshList", at = @At(value = "INVOKE",
-            target = "Ljava/lang/String;contains(Ljava/lang/CharSequence;)Z"), require = 1, allow = 1)
-    private boolean bettersearch$matchRecord(String name, CharSequence query) {
-        return name.contains(query) || bettersearch$patterns != null
+    @ModifyExpressionValue(method = "refreshList", at = {
+            @At(value = "INVOKE", target = "Ljava/lang/String;contains(Ljava/lang/CharSequence;)Z"),
+            @At(value = "INVOKE", target = "Lme/towdium/jecharacters/utils/Match;contains(Ljava/lang/String;Ljava/lang/CharSequence;)Z")
+    }, require = 1, allow = 1)
+    private boolean bettersearch$matchRecord(boolean original) {
+        return original || bettersearch$patterns != null
                 && bettersearch$patterns.matches(bettersearch$currentRecord);
     }
 
