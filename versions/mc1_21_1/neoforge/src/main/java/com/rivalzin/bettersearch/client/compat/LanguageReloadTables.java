@@ -7,6 +7,12 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 
 public final class LanguageReloadTables {
+    public interface Target {
+        String bettersearch$getTargetLanguage();
+
+        void bettersearch$setTargetLanguage(String language);
+    }
+
     private static final ClassValue<Access> ACCESS = new ClassValue<>() {
         @Override
         protected Access computeValue(Class<?> type) {

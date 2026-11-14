@@ -8,7 +8,10 @@ import com.rivalzin.bettersearch.FailurePolicy;
 import com.rivalzin.bettersearch.core.SearchSettings;
 
 import java.io.BufferedReader;
+import java.io.Reader;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -20,12 +23,14 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 public final class LanguageReloadIntegration {
     private static final String[] CONFIGS = {
             "jerozgen.languagereload.config.Config",
-            "com.euphony.neo_language_reload.config.Config"
+            "com.euphony.neo_language_reload.config.Config",
+            "org.hiedacamellia.languagereload.core.config.ClientConfig"
     };
     private static BooleanSupplier enabled;
     private static Supplier<SearchSettings> current;
@@ -38,6 +43,15 @@ public final class LanguageReloadIntegration {
 
     public static boolean available() {
         return AccessHolder.ACCESS != null;
+    }
+
+    static boolean present(Predicate<String> classes) {
+        for (String name : CONFIGS) {
+            if (classes.test(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static void bind(BooleanSupplier active, Supplier<SearchSettings> settings,
@@ -54,15 +68,15 @@ public final class LanguageReloadIntegration {
             return;
         }
         try {
-            Path source = access.path();
+            Path source = access.path(betterSearchFile);
             if (source == null || source.toAbsolutePath().normalize()
                     .equals(betterSearchFile.toAbsolutePath().normalize())
                     || !Files.isRegularFile(source) || Files.size(source) > 1_048_576L) {
                 return;
             }
             try (BufferedReader reader = Files.newBufferedReader(source, StandardCharsets.UTF_8)) {
-                JsonElement json = new JsonParser().parse(reader);
-                List<String> languages = fromStored(json);
+                List<String> languages = access.configPath == null
+                        ? fromToml(reader) : fromStored(new JsonParser().parse(reader));
                 if (languages != null && languages.size() > 2) {
                     settings.languages = languages;
                 }
@@ -96,7 +110,7 @@ public final class LanguageReloadIntegration {
             return;
         }
         SearchSettings settings = current.get();
-        if (languages != null && !sameLanguages(languages, settings.languages)) {
+        if (!sameLanguages(languages, settings.languages)) {
             settings.languages = new ArrayList<>(languages);
             apply.accept(settings);
         }
@@ -110,8 +124,8 @@ public final class LanguageReloadIntegration {
     private static List<String> readCurrent() {
         try {
             Access access = AccessHolder.ACCESS;
-            Object value = access.instance.get(null);
-            if (value == null) {
+            Object value = access.instance == null ? null : access.instance.get(null);
+            if (access.instance != null && value == null) {
                 return null;
             }
             Object language = access.language.get(value);
@@ -163,6 +177,33 @@ public final class LanguageReloadIntegration {
             implicitEnglish = version.getAsInt() < 1;
         }
         return normalize(language.getAsString(), values, implicitEnglish);
+    }
+
+    private static List<String> fromToml(Reader reader) throws ReflectiveOperationException {
+        Object parsed = TomlAccess.PARSE.invoke(TomlAccess.CONSTRUCTOR.newInstance(), reader);
+        Object language = TomlAccess.GET.invoke(parsed, "language");
+        Object fallbacks = TomlAccess.GET.invoke(parsed, "fallbacks");
+        return language instanceof String && fallbacks instanceof Iterable
+                ? normalize((String) language, (Iterable<?>) fallbacks, true) : null;
+    }
+
+    private static final class TomlAccess {
+        static final Constructor<?> CONSTRUCTOR;
+        static final Method PARSE;
+        static final Method GET;
+
+        static {
+            try {
+                ClassLoader loader = LanguageReloadIntegration.class.getClassLoader();
+                Class<?> parser = Class.forName("com.electronwill.nightconfig.toml.TomlParser", false, loader);
+                CONSTRUCTOR = parser.getConstructor();
+                PARSE = parser.getMethod("parse", Reader.class);
+                GET = Class.forName("com.electronwill.nightconfig.core.UnmodifiableConfig", false, loader)
+                        .getMethod("get", String.class);
+            } catch (ReflectiveOperationException error) {
+                throw new IllegalStateException("Unsupported Language Reload configuration parser", error);
+            }
+        }
     }
 
     private static List<String> normalize(String language, Iterable<?> fallbacks, boolean implicitEnglish) {
@@ -240,13 +281,23 @@ public final class LanguageReloadIntegration {
         Snapshot snapshot;
 
         Access(Class<?> type) throws ReflectiveOperationException {
-            instance = type.getDeclaredField("INSTANCE");
-            configPath = type.getDeclaredField("PATH");
             language = type.getField("language");
             fallbacks = type.getField("fallbacks");
+            boolean staticLanguage = Modifier.isStatic(language.getModifiers());
+            if (language.getType() != String.class || !Iterable.class.isAssignableFrom(fallbacks.getType())
+                    || staticLanguage != Modifier.isStatic(fallbacks.getModifiers())) {
+                throw new NoSuchFieldException("Unsupported Language Reload configuration");
+            }
+            if (staticLanguage) {
+                instance = null;
+                configPath = null;
+                version = null;
+                return;
+            }
+            instance = type.getDeclaredField("INSTANCE");
+            configPath = type.getDeclaredField("PATH");
             if (!Modifier.isStatic(instance.getModifiers()) || !type.isAssignableFrom(instance.getType())
-                    || !Modifier.isStatic(configPath.getModifiers()) || !Path.class.isAssignableFrom(configPath.getType())
-                    || language.getType() != String.class || !Iterable.class.isAssignableFrom(fallbacks.getType())) {
+                    || !Modifier.isStatic(configPath.getModifiers()) || !Path.class.isAssignableFrom(configPath.getType())) {
                 throw new NoSuchFieldException("Unsupported Language Reload configuration");
             }
             instance.setAccessible(true);
@@ -263,8 +314,9 @@ public final class LanguageReloadIntegration {
             version = revision;
         }
 
-        Path path() throws IllegalAccessException {
-            return (Path) configPath.get(null);
+        Path path(Path betterSearchFile) throws IllegalAccessException {
+            return configPath == null ? betterSearchFile.resolveSibling("languagereload-client.toml")
+                    : (Path) configPath.get(null);
         }
     }
 

@@ -4,6 +4,6 @@
   "package": "com.rivalzin.bettersearch.mixin.languagereload",
   "plugin": "com.rivalzin.bettersearch.mixin.languagereload.LanguageReloadTablePlugin",
   "compatibilityLevel": "JAVA_21",
-  "client": ["LanguageReloadTableMixin"],
+  "client": ["LanguageReloadTableMixin", "LanguageReloadScopeMixin"],
   "injectors": {"defaultRequire": 1}
 }

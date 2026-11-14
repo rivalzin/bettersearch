@@ -92,8 +92,7 @@ public final class IntegrationAvailability {
                         "net.p3pp3rf1y.sophisticatedcore.client.gui.StorageScreenBase",
                         "net.p3pp3rf1y.sophisticatedstorage.client.gui.StorageScreen");
             case "language_reload":
-                return any(classes, "jerozgen.languagereload.config.Config",
-                        "com.euphony.neo_language_reload.config.Config");
+                return LanguageReloadIntegration.present(classes);
             default:
                 return false;
         }

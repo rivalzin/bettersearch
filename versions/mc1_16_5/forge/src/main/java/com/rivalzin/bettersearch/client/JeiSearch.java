@@ -47,11 +47,11 @@ public final class JeiSearch {
     }
 
     public static boolean wants(String filterText) {
-        SearchSettings settings = BetterSearchClient.settings();
-        if (!BetterSearchClient.isEnabled() || !settings.searchJei) {
+        if (filterText == null || filterText.trim().isEmpty()) {
             return false;
         }
-        if (filterText == null || filterText.trim().isEmpty()) {
+        SearchSettings settings = BetterSearchClient.settings();
+        if (!BetterSearchClient.isEnabled() || !settings.searchJei) {
             return false;
         }
         return !usesJeiSyntax(filterText);

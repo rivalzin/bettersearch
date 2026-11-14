@@ -50,9 +50,11 @@ public final class JeiSearch {
     }
 
     public static boolean wants(String filterText) {
+        if (filterText == null || filterText.trim().isEmpty()) {
+            return false;
+        }
         SearchSettings settings = BetterSearchClient.settings();
-        return settings.enabled && settings.searchJei && filterText != null
-                && !filterText.trim().isEmpty() && !usesJeiSyntax(filterText);
+        return settings.enabled && settings.searchJei && !usesJeiSyntax(filterText);
     }
 
     public static List<ITypedIngredient<?>> search(String filterText,

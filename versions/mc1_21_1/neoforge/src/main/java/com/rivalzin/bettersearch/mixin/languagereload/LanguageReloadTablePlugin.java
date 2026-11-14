@@ -9,32 +9,52 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
+import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.VarInsnNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 
 public final class LanguageReloadTablePlugin implements IMixinConfigPlugin {
     private boolean compatible;
+    private boolean threadingSupported;
+    private boolean scopedSearch;
 
     @Override
     public void onLoad(String mixinPackage) {
         compatible = false;
+        threadingSupported = false;
+        scopedSearch = false;
         String resource = "org/hiedacamellia/languagereload/core/mixin/TranslationStorageMixin.class";
         try (InputStream input = getClass().getClassLoader().getResourceAsStream(resource)) {
             if (input == null) {
                 return;
             }
             ClassNode node = new ClassNode();
-            new ClassReader(input).accept(node, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+            new ClassReader(input).accept(node, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
             boolean pending = node.fields.stream().anyMatch(field -> field.name.equals("separateTranslationsOnLoad")
                     && field.desc.equals("Ljava/util/Map;") && (field.access & Opcodes.ACC_STATIC) != 0);
             boolean table = node.fields.stream().anyMatch(field -> field.name.equals("separateTranslations")
                     && field.desc.equals("Ljava/util/Map;") && (field.access & Opcodes.ACC_STATIC) == 0);
             compatible = pending && table;
+            boolean target = node.fields.stream().anyMatch(field -> field.name.equals("targetLanguage")
+                    && field.desc.equals("Ljava/lang/String;") && (field.access & Opcodes.ACC_STATIC) == 0);
+            threadingSupported = compatible && target && targetAccessCounts(node, node.name);
+            if (threadingSupported) {
+                try (InputStream search = getClass().getClassLoader().getResourceAsStream(
+                        "org/hiedacamellia/languagereload/core/mixin/SearchManagerMixin.class")) {
+                    if (search != null) {
+                        ClassNode searchNode = new ClassNode();
+                        new ClassReader(search).accept(searchNode, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+                        scopedSearch = searchNode.methods.stream().anyMatch(method -> method.name.equals("addFallbackTranslationsToSearchTooltips")
+                                && method.desc.equals("(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/world/item/Item$TooltipContext;Lnet/minecraft/world/entity/player/Player;Lnet/minecraft/world/item/TooltipFlag;Lcom/llamalad7/mixinextras/injector/wrapoperation/Operation;)Ljava/util/List;"));
+                    }
+                }
+            }
         } catch (IOException | RuntimeException error) {
             compatible = false;
         }
@@ -42,7 +62,7 @@ public final class LanguageReloadTablePlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-        return compatible;
+        return compatible && (!mixinClassName.endsWith(".LanguageReloadScopeMixin") || scopedSearch);
     }
 
     @Override
@@ -65,6 +85,27 @@ public final class LanguageReloadTablePlugin implements IMixinConfigPlugin {
 
     @Override
     public void postApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
+        if (!mixinClassName.endsWith(".LanguageReloadTableMixin")) {
+            return;
+        }
+        if (threadingSupported && targetAccessCounts(targetClass, targetClass.name)) {
+            for (var method : targetClass.methods) {
+                if (!targetMethod(method)) {
+                    continue;
+                }
+                for (var instruction : method.instructions.toArray()) {
+                    if (instruction instanceof FieldInsnNode field && targetField(field, targetClass.name)) {
+                        boolean read = field.getOpcode() == Opcodes.GETFIELD;
+                        method.instructions.set(field, new MethodInsnNode(Opcodes.INVOKEVIRTUAL, targetClass.name,
+                                read ? "bettersearch$getTargetLanguage" : "bettersearch$setTargetLanguage",
+                                read ? "()Ljava/lang/String;" : "(Ljava/lang/String;)V", false));
+                    }
+                }
+            }
+        } else if (threadingSupported) {
+            System.getLogger("Better Search").log(System.Logger.Level.WARNING,
+                    "Language Reload target-language isolation was skipped because the merged translation-storage contract changed");
+        }
         boolean capturing = false;
         for (var method : targetClass.methods) {
             if (!method.name.equals("appendFrom")
@@ -119,5 +160,37 @@ public final class LanguageReloadTablePlugin implements IMixinConfigPlugin {
                 method.maxStack++;
             }
         }
+    }
+
+    private static boolean targetMethod(MethodNode method) {
+        return (method.name.equals("onGet") || method.name.endsWith("$onGet"))
+                && method.desc.equals("(Ljava/lang/String;Ljava/lang/String;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;)V")
+                || method.name.equals("languagereload_getTargetLanguage") && method.desc.equals("()Ljava/lang/String;")
+                || method.name.equals("languagereload_setTargetLanguage") && method.desc.equals("(Ljava/lang/String;)V");
+    }
+
+    private static boolean targetField(FieldInsnNode field, String owner) {
+        return field.owner.equals(owner) && field.name.equals("targetLanguage") && field.desc.equals("Ljava/lang/String;")
+                && (field.getOpcode() == Opcodes.GETFIELD || field.getOpcode() == Opcodes.PUTFIELD);
+    }
+
+    private static boolean targetAccessCounts(ClassNode node, String owner) {
+        int reads = 0;
+        int writes = 0;
+        for (var method : node.methods) {
+            if (!targetMethod(method)) {
+                continue;
+            }
+            for (var instruction : method.instructions) {
+                if (instruction instanceof FieldInsnNode field && targetField(field, owner)) {
+                    if (field.getOpcode() == Opcodes.GETFIELD) {
+                        reads++;
+                    } else {
+                        writes++;
+                    }
+                }
+            }
+        }
+        return reads == 3 && writes == 1;
     }
 }
